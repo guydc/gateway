@@ -1838,6 +1838,32 @@ type ConnectionLimit struct {
 	CloseDelay *metav1.Duration `json:"closeDelay,omitempty" yaml:"closeDelay,omitempty"`
 }
 
+type ExtProcHeaderProcessingMode egv1a1.ExtProcHeaderProcessingMode
+
+const (
+	// ExtProcHeaderDefault sets the default header processing mode
+	ExtProcHeaderDefault = ExtProcHeaderProcessingMode(egv1a1.DefaultExtProcHeaderProcessingMode)
+	// ExtProcHeaderSend sets the send header processing mode
+	ExtProcHeaderSend = ExtProcHeaderProcessingMode(egv1a1.SendExtProcHeaderProcessingMode)
+	// ExtProcHeaderSkip sets the skip header processing mode
+	ExtProcHeaderSkip = ExtProcHeaderProcessingMode(egv1a1.SkipExtProcHeaderProcessingMode)
+)
+
+
+type ExtProcBodyProcessingMode egv1a1.ExtProcBodyProcessingMode
+
+const (
+	// ExtProcBodyNone sets the none body processing mode
+	ExtProcBodyNone = ExtProcBodyProcessingMode(egv1a1.NoneExtProcHeaderProcessingMode)
+	// ExtProcBodyStreamed sets the streamed body processing mode
+	ExtProcBodyStreamed = ExtProcBodyProcessingMode(egv1a1.StreamedExtProcHeaderProcessingMode)
+	// ExtProcBodyBuffered sets the buffered body processing mode
+	ExtProcBodyBuffered = ExtProcBodyProcessingMode(egv1a1.BufferedExtProcHeaderProcessingMode)
+	// ExtProcBodyBufferedPartial sets the partial buffered body processing mode
+	ExtProcBodyBufferedPartial = ExtProcBodyProcessingMode(egv1a1.BufferedPartialExtProcHeaderProcessingMode)
+)
+
+
 // ExtProc holds the information associated with the ExtProc extensions.
 // +k8s:deepcopy-gen=true
 type ExtProc struct {
@@ -1846,8 +1872,41 @@ type ExtProc struct {
 	Name string `json:"name" yaml:"name"`
 
 	// Destination defines the destination for the gRPC External Processing service.
-	Destination RouteDestination `json:"destination"`
+	Destination RouteDestination `json:"destination" yaml:"destination"`
 
 	// Authority is the hostname:port of the HTTP External Processing service.
-	Authority string `json:"authority"`
+	Authority string `json:"authority" json:"authority"`
+
+	// RequestHeaderProcessingMode Defines request header processing
+	RequestHeaderProcessingMode *ExtProcHeaderProcessingMode `json:"requestHeaderProcessingMode,omitempty" yaml:"requestHeaderProcessingMode,omitempty""`
+
+	// RequestBodyProcessingMode Defines request body processing
+	RequestBodyProcessingMode *ExtProcBodyProcessingMode `json:"requestBodyProcessingMode,omitempty" yaml:"requestBodyProcessingMode,omitempty"`
+
+	// ResponseHeaderProcessingMode Defines response header processing
+	ResponseHeaderProcessingMode *ExtProcHeaderProcessingMode `json:"responseHeaderProcessingMode,omitempty" yaml:"responseHeaderProcessingMode,omitempty"`
+
+	// ResponseBodyProcessingMode Defines response body processing
+	ResponseBodyProcessingMode *ExtProcBodyProcessingMode `json:"responseBodyProcessingMode,omitempty" yaml:"responseBodyProcessingMode,omitempty"`
+
+	// RequestAttributes defines which envoy attributes are provided as context to external processor
+	// when processing requests
+	RequestAttributes []string `json:"requestAttributes,omitempty" yaml:"requestAttributes,omitempty"`
+
+	// ResponseAttributes defines which envoy attributes are provided as context to external processor
+	// when processing responses
+	ResponseAttributes []string `json:"responseAttributes,omitempty" yaml:"responseAttributes,omitempty"`
+
+	// UntypedForwardingMetadataNamespaces are metadata namespaces forwarded to external processor
+	UntypedForwardingMetadataNamespaces []string `json:"untypedForwardingMetadataNamespaces,omitempty" yaml:"untypedForwardingMetadataNamespaces,omitempty"`
+
+	// UntypedReceivingMetadataNamespaces are metadata namespaces updatable by external processor
+	UntypedReceivingMetadataNamespaces []string `json:"untypedReceivingMetadataNamespaces,omitempty" yaml:"untypedReceivingMetadataNamespaces,omitempty"`
+
+	// MessageTimeout is the timeout for a response to be returned from the external processor
+	MessageTimeout *metav1.Duration `json:"messageTimeout,omitempty" yaml:"messageTimeout,omitempty"`
+
+	// FailOpen defines if requests or responses that cannot be processed due to connectivity to the
+	// external processor are terminated or passed-through.
+	FailOpen *bool `json:"failOpen,omitempty" yaml:"failOpen,omitempty"`
 }

@@ -16,6 +16,12 @@ spec:
     backendRefs:
     - name: infra-backend-v1
       port: 8080
+    filters:
+      - type: RequestHeaderModifier
+        requestHeaderModifier:
+          add:
+            - name: "x-request-from-ext-proc-metadata"
+              value: '%DYNAMIC_METADATA(["io.envoyproxy.gateway.e2e", "ext-proc-emitted-metadata"])%'
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -46,10 +52,22 @@ spec:
     kind: HTTPRoute
     name: http-with-ext-proc
   extProc:
-  - backendRef:
-      name: grpc-ext-proc
+  - backendRefs:
+    - name: grpc-ext-proc
       namespace: gateway-conformance-infra
       port: 9002
+    attributes:
+      request:
+        - xds.route_name
+      response:
+        - xds.cluster_name
+    metadataOptions:
+      forwardingNamespaces:
+        untyped:
+          - io.envoyproxy.gateway.e2e
+      receivingNamespaces:
+        untyped:
+          - io.envoyproxy.gateway.e2e
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: BackendTLSPolicy
@@ -68,3 +86,30 @@ spec:
       group: ''
       kind: ConfigMap
     hostname: grpc-ext-proc
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyPatchPolicy
+metadata:
+  name: set-metadata-patch
+  namespace: gateway-conformance-infra
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: same-namespace
+    namespace: gateway-conformance-infra
+  type: JSONPatch
+  jsonPatches:
+    - type: "type.googleapis.com/envoy.config.listener.v3.Listener"
+      # The listener name is of the form <GatewayNamespace>/<GatewayName>/<GatewayListenerName>
+      name: gateway-conformance-infra/same-namespace/http
+      operation:
+        op: add
+        path: "/default_filter_chain/filters/0/typed_config/http_filters/0"
+        value:
+          name: "envoy.filters.http.set_metadata"
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+            metadata_namespace: "io.envoyproxy.gateway.e2e"
+            value:
+              ext-proc-metadata: "forwarded"

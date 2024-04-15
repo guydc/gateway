@@ -73,8 +73,8 @@ envoyExtensionPolicies:
     namespace: default
   spec:
     extProc:
-    - backendRef:
-        name: grpc-backend-2
+    - backendRefs:
+      - name: grpc-backend-2
         port: 9000
     targetRef:
       group: gateway.networking.k8s.io
@@ -104,10 +104,32 @@ envoyExtensionPolicies:
     namespace: default
   spec:
     extProc:
-    - backendRef:
-        name: grpc-backend
+    - attributes:
+        request:
+        - xds.route_metadata
+        - connection.requested_server_name
+        response:
+        - request.path
+      backendRefs:
+      - name: grpc-backend
         namespace: envoy-gateway
         port: 8000
+      failOpen: true
+      messageTimeout: 5s
+      metadataOptions:
+        forwardingNamespaces:
+          untyped:
+          - envoy.filters.http.ext_authz
+        receivingNamespaces:
+          untyped:
+          - envoy.filters.http.my_custom
+      processingMode:
+        request:
+          body: Buffered
+          headers: Send
+        response:
+          body: Streamed
+          headers: Skip
     targetRef:
       group: gateway.networking.k8s.io
       kind: Gateway
@@ -298,7 +320,7 @@ xdsIR:
         extProc:
         - authority: grpc-backend-2.default:9000
           destination:
-            name: envoyextensionpolicy/default/policy-for-http-route/0/grpc-backend-2
+            name: envoyextensionpolicy/default/policy-for-http-route/0
             settings:
             - addressType: IP
               endpoints:
@@ -334,7 +356,7 @@ xdsIR:
         extProc:
         - authority: grpc-backend.envoy-gateway:8000
           destination:
-            name: envoyextensionpolicy/default/policy-for-gateway/0/grpc-backend
+            name: envoyextensionpolicy/default/policy-for-gateway/0
             settings:
             - addressType: IP
               protocol: GRPC
@@ -344,7 +366,22 @@ xdsIR:
                   name: policy-btls-grpc/default-ca
                 sni: grpc-backend
               weight: 1
+          failOpen: true
+          messageTimeout: 5s
           name: envoyextensionpolicy/default/policy-for-gateway/0
+          requestAttributes:
+          - xds.route_metadata
+          - connection.requested_server_name
+          requestBodyProcessingMode: Buffered
+          requestHeaderProcessingMode: Send
+          responseAttributes:
+          - request.path
+          responseBodyProcessingMode: Streamed
+          responseHeaderProcessingMode: Skip
+          untypedForwardingMetadataNamespaces:
+          - envoy.filters.http.ext_authz
+          untypedReceivingMetadataNamespaces:
+          - envoy.filters.http.my_custom
         hostname: www.bar.com
         isHTTP2: false
         name: httproute/default/httproute-2/rule/0/match/0/www_bar_com

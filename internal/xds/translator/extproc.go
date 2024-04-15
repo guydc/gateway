@@ -7,13 +7,13 @@ package translator
 
 import (
 	"errors"
-
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	routev3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	extprocv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3"
 	hcmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"github.com/golang/protobuf/ptypes/duration"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/envoyproxy/gateway/internal/ir"
 	"github.com/envoyproxy/gateway/internal/xds/types"
@@ -97,6 +97,31 @@ func extProcFilterName(extProc ir.ExtProc) string {
 	return perRouteFilterName(extProcFilter, extProc.Name)
 }
 
+func buildExtProcBodyProcessingMode(mode *ir.ExtProcBodyProcessingMode) extprocv3.ProcessingMode_BodySendMode {
+	lookup := map[ir.ExtProcBodyProcessingMode]extprocv3.ProcessingMode_BodySendMode{
+		ir.ExtProcBodyNone: extprocv3.ProcessingMode_NONE,
+		ir.ExtProcBodyBuffered: extprocv3.ProcessingMode_BUFFERED,
+		ir.ExtProcBodyBufferedPartial: extprocv3.ProcessingMode_BUFFERED_PARTIAL,
+		ir.ExtProcBodyStreamed: extprocv3.ProcessingMode_STREAMED,
+	}
+	if r, found := lookup[*mode]; found {
+		return r
+	}
+	return extprocv3.ProcessingMode_NONE
+}
+
+func buildExtProcHeaderProcessingMode(mode *ir.ExtProcHeaderProcessingMode) extprocv3.ProcessingMode_HeaderSendMode {
+	lookup := map[ir.ExtProcHeaderProcessingMode]extprocv3.ProcessingMode_HeaderSendMode{
+		ir.ExtProcHeaderDefault: extprocv3.ProcessingMode_DEFAULT,
+		ir.ExtProcHeaderSend: extprocv3.ProcessingMode_SEND,
+		ir.ExtProcHeaderSkip: extprocv3.ProcessingMode_SKIP,
+	}
+	if r, found := lookup[*mode]; found {
+		return r
+	}
+	return extprocv3.ProcessingMode_DEFAULT
+}
+
 func extProcConfig(extProc ir.ExtProc) *extprocv3.ExternalProcessor {
 	config := &extprocv3.ExternalProcessor{
 		GrpcService: &corev3.GrpcService{
@@ -107,6 +132,70 @@ func extProcConfig(extProc ir.ExtProc) *extprocv3.ExternalProcessor {
 				Seconds: defaultExtServiceRequestTimeout,
 			},
 		},
+		ProcessingMode: &extprocv3.ProcessingMode{
+			RequestHeaderMode: extprocv3.ProcessingMode_SEND,
+			ResponseHeaderMode: extprocv3.ProcessingMode_SEND,
+			RequestBodyMode: extprocv3.ProcessingMode_NONE,
+			ResponseBodyMode: extprocv3.ProcessingMode_NONE,
+			RequestTrailerMode: extprocv3.ProcessingMode_SKIP,
+			ResponseTrailerMode: extprocv3.ProcessingMode_SKIP,
+		},
+	}
+
+	if extProc.RequestHeaderProcessingMode != nil {
+		config.ProcessingMode.RequestHeaderMode = buildExtProcHeaderProcessingMode(extProc.RequestHeaderProcessingMode)
+	}
+
+	if extProc.RequestBodyProcessingMode != nil {
+		config.ProcessingMode.RequestBodyMode = buildExtProcBodyProcessingMode(extProc.RequestBodyProcessingMode)
+	}
+
+	if extProc.ResponseHeaderProcessingMode != nil {
+		config.ProcessingMode.ResponseHeaderMode = buildExtProcHeaderProcessingMode(extProc.ResponseHeaderProcessingMode)
+	}
+
+	if extProc.ResponseBodyProcessingMode != nil {
+		config.ProcessingMode.ResponseBodyMode = buildExtProcBodyProcessingMode(extProc.ResponseBodyProcessingMode)
+	}
+
+	if extProc.RequestAttributes != nil {
+		var attrs []string
+		attrs = append(attrs, extProc.RequestAttributes...)
+		config.RequestAttributes = attrs
+	}
+
+	if extProc.ResponseAttributes != nil {
+		var attrs []string
+		attrs = append(attrs, extProc.ResponseAttributes...)
+		config.ResponseAttributes = attrs
+	}
+
+	if extProc.UntypedForwardingMetadataNamespaces != nil || extProc.UntypedReceivingMetadataNamespaces != nil {
+		config.MetadataOptions = &extprocv3.MetadataOptions{}
+
+		if extProc.UntypedForwardingMetadataNamespaces != nil {
+			var ns []string
+			ns = append(ns, extProc.UntypedForwardingMetadataNamespaces...)
+			config.MetadataOptions.ForwardingNamespaces = &extprocv3.MetadataOptions_MetadataNamespaces{
+				Untyped: ns,
+			}
+		}
+
+		if extProc.UntypedReceivingMetadataNamespaces != nil {
+			var ns []string
+			ns = append(ns, extProc.UntypedReceivingMetadataNamespaces...)
+			config.MetadataOptions.ReceivingNamespaces = &extprocv3.MetadataOptions_MetadataNamespaces{
+				Untyped: ns,
+			}
+		}
+	}
+
+	if extProc.FailOpen != nil {
+		config.FailureModeAllow = *extProc.FailOpen
+	}
+
+	if extProc.MessageTimeout != nil {
+		config.MessageTimeout = durationpb.New(extProc.MessageTimeout.Duration)
 	}
 
 	return config

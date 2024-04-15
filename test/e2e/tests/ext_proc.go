@@ -26,10 +26,10 @@ func init() {
 	ConformanceTests = append(ConformanceTests, ExtProcTest)
 }
 
-// ExtProcTest tests ExtProcs authentication for an http route with ExtProcs configured.
+// ExtProcTest tests ExtProc authentication for an http route with ExtProc configured.
 var ExtProcTest = suite.ConformanceTest{
-	ShortName:   "ExtProcs",
-	Description: "Test ExtProcs service that adds request and response headers",
+	ShortName:   "ExtProc",
+	Description: "Test ExtProc service that adds request and response headers",
 	Manifests:   []string{"testdata/ext-proc-service.yaml", "testdata/ext-proc-envoyextensionpolicy.yaml"},
 	Test: func(t *testing.T, suite *suite.ConformanceTestSuite) {
 		t.Run("http route with ext proc", func(t *testing.T) {
@@ -37,7 +37,7 @@ var ExtProcTest = suite.ConformanceTest{
 			routeNN := types.NamespacedName{Name: "http-with-ext-proc", Namespace: ns}
 			gwNN := types.NamespacedName{Name: "same-namespace", Namespace: ns}
 			gwAddr := kubernetes.GatewayAndHTTPRoutesMustBeAccepted(t, suite.Client, suite.TimeoutConfig, suite.ControllerName, kubernetes.NewGatewayRef(gwNN), routeNN)
-
+			gwAddr = "127.0.0.1:10080"
 			ancestorRef := gwv1a2.ParentReference{
 				Group:     gatewayapi.GroupPtr(gwv1.GroupName),
 				Kind:      gatewayapi.KindPtr(gatewayapi.KindGateway),
@@ -56,13 +56,25 @@ var ExtProcTest = suite.ConformanceTest{
 					Host: "www.example.com",
 					Path: "/processor",
 					Headers: map[string]string{
-						"x-request-ext-processed": "true", // header added by ext-processor to request
+						// header added by ext-processor to request
+						"x-request-ext-processed": "true",
+						// header added by ext-processor to request based on the xds.route_name attribute
+						"x-request-xds-route-name": "httproute/gateway-conformance-infra/http-with-ext-proc/rule/0/match/0/www_example_com",
+						// header added by ext-processor to request based on the
+						// io.envoyproxy.gateway.e2e.ext-proc-metadata dynamic metadata
+						"x-request-forwarded-metadata": "forwarded",
+						// header added by HCM based on metadata emitted by the external processor to
+						// the io.envoyproxy.gateway.e2e.ext-proc-emitted-metadata
+						"ext-proc-emitted-metadata" : "received",
 					},
 				},
 				Response: http.Response{
 					StatusCode: 200,
 					Headers: map[string]string{
-						"x-response-ext-processed": "true", // header added by ext-processor to request
+						// header added by ext-processor to response
+						"x-response-ext-processed": "true",
+						// header added by ext-processor to response based on the xds.cluster_name attribute
+						"x-response-xds-cluster-name" : "httproute/gateway-conformance-infra/http-with-ext-proc/rule/0",
 					},
 				},
 				Namespace: ns,

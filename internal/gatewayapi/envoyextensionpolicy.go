@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 
-	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1a2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1b1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -376,46 +376,111 @@ func (t *Translator) buildExtProc(
 	extProcIdx int,
 	resources *Resources) (*ir.ExtProc, error) {
 	var (
-		backendRef *gwapiv1.BackendObjectReference
 		ds         *ir.DestinationSetting
 		authority  string
 		err        error
 	)
 
-	backendRef = &extProc.BackendRef.BackendObjectReference
+	var dsl []*ir.DestinationSetting
+	for _, br := range extProc.BackendRefs {
+		if err = t.validateExtServiceBackendReference(
+			&br.BackendObjectReference,
+			policyNamespacedName.Namespace,
+			resources); err != nil {
+			return nil, err
+		}
 
-	if err = t.validateExtServiceBackendReference(
-		backendRef,
-		policyNamespacedName.Namespace,
-		resources); err != nil {
-		return nil, err
-	}
+		ds, err = t.processExtServiceDestination(
+			&br.BackendObjectReference,
+			policyNamespacedName,
+			egv1a1.KindEnvoyExtensionPolicy,
+			ir.GRPC,
+			resources)
 
-	authority = fmt.Sprintf(
-		"%s.%s:%d",
-		backendRef.Name,
-		NamespaceDerefOr(backendRef.Namespace, policyNamespacedName.Namespace),
-		*backendRef.Port)
+		if err != nil {
+			return nil, err
+		}
 
-	if ds, err = t.processExtServiceDestination(
-		backendRef,
-		policyNamespacedName,
-		egv1a1.KindEnvoyExtensionPolicy,
-		ir.GRPC,
-		resources); err != nil {
-		return nil, err
+		dsl = append(dsl, ds)
 	}
 
 	rd := ir.RouteDestination{
-		Name: irIndexedExtServiceDestinationName(policyNamespacedName, egv1a1.KindEnvoyExtensionPolicy,
-			string(backendRef.Name), extProcIdx),
-		Settings: []*ir.DestinationSetting{ds},
+		Name: irIndexedExtServiceDestinationName(policyNamespacedName, egv1a1.KindEnvoyExtensionPolicy, extProcIdx),
+		Settings: dsl,
+	}
+
+	if extProc.Authority != nil {
+		authority = *extProc.Authority
+	} else { // if no user-defined authority provided, use the first backendRef to build a spec-compliant authority
+		authority = fmt.Sprintf(
+			"%s.%s:%d",
+			extProc.BackendRefs[0].Name,
+			NamespaceDerefOr(extProc.BackendRefs[0].Namespace, policyNamespacedName.Namespace),
+			*extProc.BackendRefs[0].Port)
 	}
 
 	extProcIR := &ir.ExtProc{
 		Name:        name,
 		Destination: rd,
 		Authority:   authority,
+	}
+
+	if extProc.ProcessingMode != nil {
+		if extProc.ProcessingMode.Request != nil {
+			if extProc.ProcessingMode.Request.Headers != nil {
+				extProcIR.RequestHeaderProcessingMode = ptr.To(ir.ExtProcHeaderProcessingMode(*extProc.ProcessingMode.Request.Headers))
+			}
+
+			if extProc.ProcessingMode.Request.Body != nil {
+				extProcIR.RequestBodyProcessingMode = ptr.To(ir.ExtProcBodyProcessingMode(*extProc.ProcessingMode.Request.Body))
+			}
+		}
+
+		if extProc.ProcessingMode.Response != nil {
+			if extProc.ProcessingMode.Response.Headers != nil {
+				extProcIR.ResponseHeaderProcessingMode = ptr.To(ir.ExtProcHeaderProcessingMode(*extProc.ProcessingMode.Response.Headers))
+			}
+
+			if extProc.ProcessingMode.Response.Body != nil {
+				extProcIR.ResponseBodyProcessingMode = ptr.To(ir.ExtProcBodyProcessingMode(*extProc.ProcessingMode.Response.Body))
+			}
+		}
+	}
+
+	if extProc.Attributes != nil {
+		if extProc.Attributes.Request != nil {
+			extProcIR.RequestAttributes = append(extProcIR.RequestAttributes, extProc.Attributes.Request...)
+		}
+
+		if extProc.Attributes.Response != nil {
+			extProcIR.ResponseAttributes = append(extProcIR.ResponseAttributes, extProc.Attributes.Response...)
+		}
+	}
+
+	if extProc.MetadataOptions != nil {
+		if extProc.MetadataOptions.ForwardingNamespaces != nil &&
+			extProc.MetadataOptions.ForwardingNamespaces.Untyped != nil {
+			extProcIR.UntypedForwardingMetadataNamespaces = append(extProcIR.UntypedForwardingMetadataNamespaces,
+				extProc.MetadataOptions.ForwardingNamespaces.Untyped...)
+		}
+
+		if extProc.MetadataOptions.ReceivingNamespaces != nil &&
+			extProc.MetadataOptions.ReceivingNamespaces.Untyped != nil {
+			extProcIR.UntypedReceivingMetadataNamespaces = append(extProcIR.UntypedReceivingMetadataNamespaces,
+				extProc.MetadataOptions.ReceivingNamespaces.Untyped...)
+		}
+	}
+
+	if extProc.MessageTimeout != nil {
+		d, err := time.ParseDuration(string(*extProc.MessageTimeout))
+		if err != nil {
+			return nil, fmt.Errorf("invalid ExtProc MessageTimeout value %v", extProc.MessageTimeout)
+		}
+		extProcIR.MessageTimeout = ptr.To(metav1.Duration{Duration: d})
+	}
+
+	if extProc.FailOpen != nil {
+		extProcIR.FailOpen = extProc.FailOpen
 	}
 
 	return extProcIR, err

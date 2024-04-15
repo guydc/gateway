@@ -83,12 +83,12 @@ type ExtProcMetadataOptions struct {
 	// metadata namespaces forwarded to external processor
 	//
 	// +optional
-	ForwardingNamespaces []MetadataNamespaces `json:"forwardingNamespaces,omitempty"`
+	ForwardingNamespaces *MetadataNamespaces `json:"forwardingNamespaces,omitempty"`
 
 	// metadata namespaces updatable by external processor
 	//
 	// +optional
-	ReceivingNamespaces []MetadataNamespaces `json:"receivingNamespaces,omitempty"`
+	ReceivingNamespaces *MetadataNamespaces `json:"receivingNamespaces,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="has(self.backendRef) ? (!has(self.backendRef.group) || self.backendRef.group == \"\") : true", message="group is invalid, only the core API group (specified by omitting the group field or setting it to an empty string) is supported"
@@ -96,8 +96,17 @@ type ExtProcMetadataOptions struct {
 //
 // ExtProc defines the configuration for External Processing filter.
 type ExtProc struct {
-	// Service defines the configuration of the external processing service
-	BackendRef ExtProcBackendRef `json:"backendRef"`
+	// BackendRefs defines the configuration of the external processing services
+	//
+	// +optional
+	// +kubebuilder:validation:MaxItems=4
+	// +kubebuilder:validation:MinItems=1
+	BackendRefs []ExtProcBackendRef `json:"backendRefs,omitempty"`
+
+	// Authority define the value of the authority header used when executing processing requests
+	//
+	// +optional
+	Authority *string `json:"authority,omitempty"`
 
 	// ProcessingMode defines how request and response headers and body are processed
 	// Default: request and response headers are sent, body is not sent

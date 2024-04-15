@@ -1017,7 +1017,8 @@ _Appears in:_
 
 | Field | Type | Required | Description |
 | ---   | ---  | ---      | ---         |
-| `backendRef` | _[ExtProcBackendRef](#extprocbackendref)_ |  true  | Service defines the configuration of the external processing service |
+| `backendRefs` | _[ExtProcBackendRef](#extprocbackendref) array_ |  false  | BackendRefs defines the configuration of the external processing services |
+| `authority` | _string_ |  false  | Authority define the value of the authority header used when executing processing requests |
 | `processingMode` | _[ExtProcProcessingMode](#extprocprocessingmode)_ |  false  | ProcessingMode defines how request and response headers and body are processed<br />Default: request and response headers are sent, body is not sent |
 | `attributes` | _[ExtProcAttributes](#extprocattributes)_ |  false  | Attributes defines which envoy request and response attributes are provided as context to external processor<br />Default: no attributes are sent |
 | `metadataOptions` | _[ExtProcMetadataOptions](#extprocmetadataoptions)_ |  false  | MetadataOptions defines options related to the sending and receiving of dynamic metadata<br />Default: no metadata context is sent or received |
@@ -1094,8 +1095,8 @@ _Appears in:_
 
 | Field | Type | Required | Description |
 | ---   | ---  | ---      | ---         |
-| `forwardingNamespaces` | _[MetadataNamespaces](#metadatanamespaces) array_ |  false  | metadata namespaces forwarded to external processor |
-| `receivingNamespaces` | _[MetadataNamespaces](#metadatanamespaces) array_ |  false  | metadata namespaces updatable by external processor |
+| `forwardingNamespaces` | _[MetadataNamespaces](#metadatanamespaces)_ |  false  | metadata namespaces forwarded to external processor |
+| `receivingNamespaces` | _[MetadataNamespaces](#metadatanamespaces)_ |  false  | metadata namespaces updatable by external processor |
 
 
 #### ExtProcProcessingMode

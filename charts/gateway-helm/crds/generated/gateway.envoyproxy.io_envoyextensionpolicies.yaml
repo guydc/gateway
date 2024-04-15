@@ -73,83 +73,95 @@ spec:
                             type: string
                           type: array
                       type: object
-                    backendRef:
-                      description: Service defines the configuration of the external
-                        processing service
-                      properties:
-                        group:
-                          default: ""
-                          description: |-
-                            Group is the group of the referent. For example, "gateway.networking.k8s.io".
-                            When unspecified or empty string, core API group is inferred.
-                          maxLength: 253
-                          pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
-                          type: string
-                        kind:
-                          default: Service
-                          description: |-
-                            Kind is the Kubernetes resource kind of the referent. For example
-                            "Service".
+                    authority:
+                      description: Authority define the value of the authority header
+                        used when executing processing requests
+                      type: string
+                    backendRefs:
+                      description: BackendRefs defines the configuration of the external
+                        processing services
+                      items:
+                        description: |-
+                          ExtProcService defines the gRPC External Processing service using the envoy grpc client
+                          The processing request and response messages are defined in
+                          https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto
+                        properties:
+                          group:
+                            default: ""
+                            description: |-
+                              Group is the group of the referent. For example, "gateway.networking.k8s.io".
+                              When unspecified or empty string, core API group is inferred.
+                            maxLength: 253
+                            pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                            type: string
+                          kind:
+                            default: Service
+                            description: |-
+                              Kind is the Kubernetes resource kind of the referent. For example
+                              "Service".
 
 
-                            Defaults to "Service" when not specified.
+                              Defaults to "Service" when not specified.
 
 
-                            ExternalName services can refer to CNAME DNS records that may live
-                            outside of the cluster and as such are difficult to reason about in
-                            terms of conformance. They also may not be safe to forward to (see
-                            CVE-2021-25740 for more information). Implementations SHOULD NOT
-                            support ExternalName Services.
+                              ExternalName services can refer to CNAME DNS records that may live
+                              outside of the cluster and as such are difficult to reason about in
+                              terms of conformance. They also may not be safe to forward to (see
+                              CVE-2021-25740 for more information). Implementations SHOULD NOT
+                              support ExternalName Services.
 
 
-                            Support: Core (Services with a type other than ExternalName)
+                              Support: Core (Services with a type other than ExternalName)
 
 
-                            Support: Implementation-specific (Services with type ExternalName)
-                          maxLength: 63
-                          minLength: 1
-                          pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
-                          type: string
-                        name:
-                          description: Name is the name of the referent.
-                          maxLength: 253
-                          minLength: 1
-                          type: string
-                        namespace:
-                          description: |-
-                            Namespace is the namespace of the backend. When unspecified, the local
-                            namespace is inferred.
+                              Support: Implementation-specific (Services with type ExternalName)
+                            maxLength: 63
+                            minLength: 1
+                            pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
+                            type: string
+                          name:
+                            description: Name is the name of the referent.
+                            maxLength: 253
+                            minLength: 1
+                            type: string
+                          namespace:
+                            description: |-
+                              Namespace is the namespace of the backend. When unspecified, the local
+                              namespace is inferred.
 
 
-                            Note that when a namespace different than the local namespace is specified,
-                            a ReferenceGrant object is required in the referent namespace to allow that
-                            namespace's owner to accept the reference. See the ReferenceGrant
-                            documentation for details.
+                              Note that when a namespace different than the local namespace is specified,
+                              a ReferenceGrant object is required in the referent namespace to allow that
+                              namespace's owner to accept the reference. See the ReferenceGrant
+                              documentation for details.
 
 
-                            Support: Core
-                          maxLength: 63
-                          minLength: 1
-                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                          type: string
-                        port:
-                          description: |-
-                            Port specifies the destination port number to use for this resource.
-                            Port is required when the referent is a Kubernetes Service. In this
-                            case, the port number is the service port number, not the target port.
-                            For other resources, destination port might be derived from the referent
-                            resource or this field.
-                          format: int32
-                          maximum: 65535
-                          minimum: 1
-                          type: integer
-                      required:
-                      - name
-                      type: object
-                      x-kubernetes-validations:
-                      - message: Must have port for Service reference
-                        rule: '(size(self.group) == 0 && self.kind == ''Service'')
-                          ? has(self.port) : true'
+                              Support: Core
+                            maxLength: 63
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                            type: string
+                          port:
+                            description: |-
+                              Port specifies the destination port number to use for this resource.
+                              Port is required when the referent is a Kubernetes Service. In this
+                              case, the port number is the service port number, not the target port.
+                              For other resources, destination port might be derived from the referent
+                              resource or this field.
+                            format: int32
+                            maximum: 65535
+                            minimum: 1
+                            type: integer
+                        required:
+                        - name
+                        type: object
+                        x-kubernetes-validations:
+                        - message: Must have port for Service reference
+                          rule: '(size(self.group) == 0 && self.kind == ''Service'')
+                            ? has(self.port) : true'
+                      maxItems: 4
+                      minItems: 1
+                      type: array
                     failOpen:
                       description: |-
                         FailOpen defines if requests or responses that cannot be processed due to connectivity to the
@@ -169,34 +181,26 @@ spec:
                       properties:
                         forwardingNamespaces:
                           description: metadata namespaces forwarded to external processor
-                          items:
-                            description: MetadataNamespaces defines metadata namespaces
-                              that can be used to forward or receive dynamic metadata
-                            properties:
-                              untyped:
-                                description: |-
-                                  Specifies a list of metadata namespaces whose values, if present, will be passed to the ext_proc service
-                                  as an opaque protobuf::Struct.
-                                items:
-                                  type: string
-                                type: array
-                            type: object
-                          type: array
+                          properties:
+                            untyped:
+                              description: |-
+                                Specifies a list of metadata namespaces whose values, if present, will be passed to the ext_proc service
+                                as an opaque protobuf::Struct.
+                              items:
+                                type: string
+                              type: array
+                          type: object
                         receivingNamespaces:
                           description: metadata namespaces updatable by external processor
-                          items:
-                            description: MetadataNamespaces defines metadata namespaces
-                              that can be used to forward or receive dynamic metadata
-                            properties:
-                              untyped:
-                                description: |-
-                                  Specifies a list of metadata namespaces whose values, if present, will be passed to the ext_proc service
-                                  as an opaque protobuf::Struct.
-                                items:
-                                  type: string
-                                type: array
-                            type: object
-                          type: array
+                          properties:
+                            untyped:
+                              description: |-
+                                Specifies a list of metadata namespaces whose values, if present, will be passed to the ext_proc service
+                                as an opaque protobuf::Struct.
+                              items:
+                                type: string
+                              type: array
+                          type: object
                       type: object
                     processingMode:
                       description: |-
@@ -242,8 +246,6 @@ spec:
                               type: string
                           type: object
                       type: object
-                  required:
-                  - backendRef
                   type: object
                   x-kubernetes-validations:
                   - message: group is invalid, only the core API group (specified
