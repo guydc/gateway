@@ -1,0 +1,320 @@
+gateways:
+  - apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      namespace: envoy-gateway
+      name: gateway-1
+      labels:
+        group: 1s
+    spec:
+      gatewayClassName: envoy-gateway-class
+      listeners:
+        - name: http
+          protocol: HTTP
+          port: 80
+          allowedRoutes:
+            namespaces:
+              from: All
+  - apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      namespace: envoy-gateway
+      name: gateway-2
+      labels:
+        group: 1s
+    spec:
+      gatewayClassName: envoy-gateway-class
+      listeners:
+        - name: http
+          protocol: HTTP
+          port: 80
+          allowedRoutes:
+            namespaces:
+              from: All
+  - apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      namespace: envoy-gateway
+      name: gateway-3
+      labels:
+        group: 2s
+    spec:
+      gatewayClassName: envoy-gateway-class
+      listeners:
+        - name: http
+          protocol: HTTP
+          port: 80
+          allowedRoutes:
+            namespaces:
+              from: All
+  - apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      namespace: envoy-gateway
+      name: gateway-4
+      labels:
+        group: 2s
+    spec:
+      gatewayClassName: envoy-gateway-class
+      listeners:
+        - name: http
+          protocol: HTTP
+          port: 80
+          allowedRoutes:
+            namespaces:
+              from: All
+grpcRoutes:
+  - apiVersion: gateway.networking.k8s.io/v1alpha2
+    kind: GRPCRoute
+    metadata:
+      namespace: default
+      name: grpcroute-1
+    spec:
+      parentRefs:
+        - namespace: envoy-gateway
+          name: gateway-1
+          sectionName: http
+        - namespace: envoy-gateway
+          name: gateway-3
+          sectionName: http
+      rules:
+        - backendRefs:
+          - group: gateway.envoyproxy.io
+            kind: Backend
+            name: backend-fqdn
+  - apiVersion: gateway.networking.k8s.io/v1alpha2
+    kind: GRPCRoute
+    metadata:
+      namespace: default
+      name: grpcroute-2
+      labels:
+        group: 22s
+    spec:
+      parentRefs:
+        - namespace: envoy-gateway
+          name: gateway-1
+          sectionName: http
+        - namespace: envoy-gateway
+          name: gateway-3
+          sectionName: http
+      rules:
+        - backendRefs:
+            - group: gateway.envoyproxy.io
+              kind: Backend
+              name: backend-fqdn
+httpRoutes:
+  - apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      namespace: default
+      name: httproute-1
+    spec:
+      hostnames:
+        - gateway.envoyproxy.io
+      parentRefs:
+        - namespace: envoy-gateway
+          name: gateway-2
+          sectionName: http
+        - namespace: envoy-gateway
+          name: gateway-4
+          sectionName: http
+      rules:
+        - matches:
+            - path:
+                value: "/"
+          backendRefs:
+            - group: gateway.envoyproxy.io
+              kind: Backend
+              name: backend-fqdn
+  - apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      namespace: default
+      name: httproute-2
+      labels:
+        group: 21s
+    spec:
+      hostnames:
+        - gateway.envoyproxy.io
+      parentRefs:
+        - namespace: envoy-gateway
+          name: gateway-2
+          sectionName: http
+        - namespace: envoy-gateway
+          name: gateway-4
+          sectionName: http
+      rules:
+        - matches:
+            - path:
+                value: "/"
+          backendRefs:
+            - group: gateway.envoyproxy.io
+              kind: Backend
+              name: backend-fqdn
+backendTrafficPolicies:
+  - apiVersion: gateway.envoyproxy.io/v1alpha1
+    kind: BackendTrafficPolicy
+    metadata:
+      namespace: policies
+      name: policy-for-gateway-1s
+    spec:
+      targetSelectors:
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          matchLabels:
+            group: 1s
+          namespaceSelector:
+            any: true
+      timeout:
+        tcp:
+          connectTimeout: 1s
+  - apiVersion: gateway.envoyproxy.io/v1alpha1
+    kind: BackendTrafficPolicy
+    metadata:
+      namespace: policies
+      name: policy-for-gateway-2s
+    spec:
+      targetSelectors:
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          matchLabels:
+            group: 2s
+          namespaceSelector:
+            any: true
+      timeout:
+        tcp:
+          connectTimeout: 2s
+  - apiVersion: gateway.envoyproxy.io/v1alpha1
+    kind: BackendTrafficPolicy
+    metadata:
+      namespace: policies
+      name: policy-for-gateway-1s-fail-override
+    spec:
+      targetSelectors:
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          matchLabels:
+            group: 1s
+          namespaceSelector:
+            any: true
+      timeout:
+        tcp:
+          connectTimeout: 10s
+  - apiVersion: gateway.envoyproxy.io/v1alpha1
+    kind: BackendTrafficPolicy
+    metadata:
+      namespace: policies
+      name: policy-for-gateway-no-namespace-selector-ignored
+    spec:
+      targetSelectors:
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          matchLabels:
+            group: 1s
+      timeout:
+        tcp:
+          connectTimeout: 10s
+  - apiVersion: gateway.envoyproxy.io/v1alpha1
+    kind: BackendTrafficPolicy
+    metadata:
+      namespace: policies-no-refgrant
+      name: policy-for-gateway-no-refgrant
+    spec:
+      targetSelectors:
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          matchLabels:
+            group: 1s
+          namespaceSelector:
+            any: true
+      timeout:
+        tcp:
+          connectTimeout: 10s
+  - apiVersion: gateway.envoyproxy.io/v1alpha1
+    kind: BackendTrafficPolicy
+    metadata:
+      namespace: policies
+      name: policy-for-route-override-21s
+    spec:
+      targetSelectors:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
+          matchLabels:
+            group: 21s
+          namespaceSelector:
+            any: true
+      timeout:
+        tcp:
+          connectTimeout: 21s
+  - apiVersion: gateway.envoyproxy.io/v1alpha1
+    kind: BackendTrafficPolicy
+    metadata:
+      namespace: policies
+      name: policy-for-route-override-22s
+    spec:
+      targetSelectors:
+        - group: gateway.networking.k8s.io
+          kind: GRPCRoute
+          matchLabels:
+            group: 22s
+          namespaceSelector:
+            any: true
+      timeout:
+        tcp:
+          connectTimeout: 22s
+  - apiVersion: gateway.envoyproxy.io/v1alpha1
+    kind: BackendTrafficPolicy
+    metadata:
+      namespace: policies-no-refgrant
+      name: policy-for-routes-no-refgrant
+    spec:
+      targetSelectors:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
+          matchLabels:
+            group: 21s
+          namespaceSelector:
+            any: true
+      timeout:
+        tcp:
+          connectTimeout: 10s
+referenceGrants:
+  - apiVersion: gateway.networking.k8s.io/v1alpha2
+    kind: ReferenceGrant
+    metadata:
+      name: refg-btp-gws
+      namespace: envoy-gateway
+    spec:
+      from:
+        - group: gateway.envoyproxy.io
+          kind: BackendTrafficPolicy
+          namespace: policies
+      to:
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+  - apiVersion: gateway.networking.k8s.io/v1alpha2
+    kind: ReferenceGrant
+    metadata:
+      name: refg-btp-routes
+      namespace: default
+    spec:
+      from:
+        - group: gateway.envoyproxy.io
+          kind: BackendTrafficPolicy
+          namespace: policies
+      to:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
+        - group: gateway.networking.k8s.io
+          kind: GRPCRoute
+backends:
+  - apiVersion: gateway.envoyproxy.io/v1alpha1
+    kind: Backend
+    metadata:
+      name: backend-fqdn
+      namespace: default
+    spec:
+      endpoints:
+        - fqdn:
+            hostname: primary.foo.com
+            port: 3000

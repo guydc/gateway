@@ -75,7 +75,7 @@ func (t *Translator) ProcessBackendTrafficPolicies(resources *resource.Resources
 	// Process the policies targeting xRoutes
 	for _, currPolicy := range backendTrafficPolicies {
 		policyName := utils.NamespacedName(currPolicy)
-		targetRefs := getPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, routes)
+		targetRefs := getNamespacedPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, routes, currPolicy.Namespace)
 		for _, currTarget := range targetRefs {
 			if currTarget.Kind != resource.KindGateway {
 				policy, found := handledPolicies[policyName]
@@ -86,7 +86,7 @@ func (t *Translator) ProcessBackendTrafficPolicies(resources *resource.Resources
 				}
 
 				// Negative statuses have already been assigned so its safe to skip
-				route, resolveErr := resolveBTPolicyRouteTargetRef(policy, currTarget, routeMap)
+				route, resolveErr := t.resolveBTPolicyRouteTargetRef(policy, currTarget, routeMap, resources)
 				if route == nil {
 					continue
 				}
@@ -149,7 +149,7 @@ func (t *Translator) ProcessBackendTrafficPolicies(resources *resource.Resources
 	// Process the policies targeting Gateways
 	for _, currPolicy := range backendTrafficPolicies {
 		policyName := utils.NamespacedName(currPolicy)
-		targetRefs := getPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, gateways)
+		targetRefs := getNamespacedPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, gateways, currPolicy.Namespace)
 		for _, currTarget := range targetRefs {
 			if currTarget.Kind == resource.KindGateway {
 				policy, found := handledPolicies[policyName]
@@ -160,7 +160,7 @@ func (t *Translator) ProcessBackendTrafficPolicies(resources *resource.Resources
 				}
 
 				// Negative statuses have already been assigned so its safe to skip
-				gateway, resolveErr := resolveBTPolicyGatewayTargetRef(policy, currTarget, gatewayMap)
+				gateway, resolveErr := t.resolveBTPolicyGatewayTargetRef(policy, currTarget, gatewayMap, resources)
 				if gateway == nil {
 					continue
 				}
@@ -222,17 +222,43 @@ func (t *Translator) ProcessBackendTrafficPolicies(resources *resource.Resources
 	return res
 }
 
-func resolveBTPolicyGatewayTargetRef(policy *egv1a1.BackendTrafficPolicy, target gwapiv1a2.LocalPolicyTargetReferenceWithSectionName, gateways map[types.NamespacedName]*policyGatewayTargetContext) (*GatewayContext, *status.PolicyResolveError) {
+func (t *Translator) resolveBTPolicyGatewayTargetRef(policy *egv1a1.BackendTrafficPolicy, target NamespacedPolicyTargetReferenceWithSectionName, gateways map[types.NamespacedName]*policyGatewayTargetContext, resources *resource.Resources) (*GatewayContext, *status.PolicyResolveError) {
 	// Check if the gateway exists
 	key := types.NamespacedName{
 		Name:      string(target.Name),
-		Namespace: policy.Namespace,
+		Namespace: target.Namespace,
 	}
 	gateway, ok := gateways[key]
 
 	// Gateway not found
 	if !ok {
 		return nil, nil
+	}
+
+	// check if the cross-namespace reference is permitted
+	if policy.Namespace != target.Namespace {
+		if !t.validateCrossNamespaceRef(
+			crossNamespaceFrom{
+				group:     egv1a1.GroupName,
+				kind:      policy.Kind,
+				namespace: policy.Namespace,
+			},
+			crossNamespaceTo{
+				group:     string(target.Group),
+				kind:      string(target.Kind),
+				namespace: target.Namespace,
+				name:      string(target.Name),
+			},
+			resources.ReferenceGrants,
+		) {
+			message := fmt.Sprintf("Policy target of Gateway %s not permitted by any ReferenceGrant",
+				string(target.Name))
+
+			return gateway.GatewayContext, &status.PolicyResolveError{
+				Reason:  gwapiv1a2.PolicyReasonInvalid,
+				Message: message,
+			}
+		}
 	}
 
 	// Check if another policy targeting the same Gateway exists
@@ -253,18 +279,44 @@ func resolveBTPolicyGatewayTargetRef(policy *egv1a1.BackendTrafficPolicy, target
 	return gateway.GatewayContext, nil
 }
 
-func resolveBTPolicyRouteTargetRef(policy *egv1a1.BackendTrafficPolicy, target gwapiv1a2.LocalPolicyTargetReferenceWithSectionName, routes map[policyTargetRouteKey]*policyRouteTargetContext) (RouteContext, *status.PolicyResolveError) {
+func (t *Translator) resolveBTPolicyRouteTargetRef(policy *egv1a1.BackendTrafficPolicy, target NamespacedPolicyTargetReferenceWithSectionName, routes map[policyTargetRouteKey]*policyRouteTargetContext, resources *resource.Resources) (RouteContext, *status.PolicyResolveError) {
 	// Check if the route exists
 	key := policyTargetRouteKey{
 		Kind:      string(target.Kind),
 		Name:      string(target.Name),
-		Namespace: policy.Namespace,
+		Namespace: target.Namespace,
 	}
 
 	route, ok := routes[key]
 	// Route not found
 	if !ok {
 		return nil, nil
+	}
+
+	// check if the cross-namespace reference is permitted
+	if policy.Namespace != target.Namespace {
+		if !t.validateCrossNamespaceRef(
+			crossNamespaceFrom{
+				group:     egv1a1.GroupName,
+				kind:      policy.Kind,
+				namespace: policy.Namespace,
+			},
+			crossNamespaceTo{
+				group:     string(target.Group),
+				kind:      string(target.Kind),
+				namespace: target.Namespace,
+				name:      string(target.Name),
+			},
+			resources.ReferenceGrants,
+		) {
+			message := fmt.Sprintf("Policy target of Route %s not permitted by any ReferenceGrant",
+				string(target.Name))
+
+			return route.RouteContext, &status.PolicyResolveError{
+				Reason:  gwapiv1a2.PolicyReasonInvalid,
+				Message: message,
+			}
+		}
 	}
 
 	// Check if another policy targeting the same xRoute exists
@@ -438,7 +490,7 @@ func (t *Translator) translateBackendTrafficPolicyForRoute(
 
 func (t *Translator) translateBackendTrafficPolicyForGateway(
 	policy *egv1a1.BackendTrafficPolicy,
-	target gwapiv1a2.LocalPolicyTargetReferenceWithSectionName,
+	target NamespacedPolicyTargetReferenceWithSectionName,
 	gateway *GatewayContext,
 	xdsIR resource.XdsIRMap,
 	resources *resource.Resources,

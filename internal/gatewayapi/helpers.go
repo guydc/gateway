@@ -533,6 +533,78 @@ type targetRefWithTimestamp struct {
 	CreationTimestamp metav1.Time
 }
 
+type namespacedTargetRefWithTimestamp struct {
+	NamespacedPolicyTargetReferenceWithSectionName
+	CreationTimestamp metav1.Time
+}
+
+type NamespacedPolicyTargetReferenceWithSectionName struct {
+	gwapiv1a2.LocalPolicyTargetReferenceWithSectionName
+	Namespace string
+}
+
+func getNamespacedPolicyTargetRefs[T client.Object](policy egv1a1.PolicyTargetReferences, potentialTargets []T, policyNamespace string) []NamespacedPolicyTargetReferenceWithSectionName{
+	dedup := sets.New[namespacedTargetRefWithTimestamp]()
+	for _, currSelector := range policy.TargetSelectors {
+		labelSelector := labels.SelectorFromSet(currSelector.MatchLabels)
+		for _, obj := range potentialTargets {
+			gvk := obj.GetObjectKind().GroupVersionKind()
+			if gvk.Kind != string(currSelector.Kind) ||
+				gvk.Group != string(ptr.Deref(currSelector.Group, gwapiv1a2.GroupName)) {
+				continue
+			}
+
+			if obj.GetNamespace() != policyNamespace &&  (currSelector.NamespaceSelector == nil || !currSelector.NamespaceSelector.Any) {
+					continue
+			}
+
+			if labelSelector.Matches(labels.Set(obj.GetLabels())) {
+				dedup.Insert(namespacedTargetRefWithTimestamp{
+					CreationTimestamp: obj.GetCreationTimestamp(),
+					NamespacedPolicyTargetReferenceWithSectionName: NamespacedPolicyTargetReferenceWithSectionName{
+						LocalPolicyTargetReferenceWithSectionName: gwapiv1a2.LocalPolicyTargetReferenceWithSectionName{
+							LocalPolicyTargetReference: gwapiv1a2.LocalPolicyTargetReference{
+								Group: gwapiv1a2.Group(gvk.Group),
+								Kind:  gwapiv1a2.Kind(gvk.Kind),
+								Name:  gwapiv1a2.ObjectName(obj.GetName()),
+							},
+						},
+						Namespace: obj.GetNamespace(),
+					},
+				})
+			}
+		}
+	}
+	selectorsList := dedup.UnsortedList()
+	slices.SortFunc(selectorsList, func(i, j namespacedTargetRefWithTimestamp) int {
+		return i.CreationTimestamp.Compare(j.CreationTimestamp.Time)
+	})
+	ret := []NamespacedPolicyTargetReferenceWithSectionName{}
+	for _, v := range selectorsList {
+		ret = append(ret, v.NamespacedPolicyTargetReferenceWithSectionName)
+	}
+	// Plain targetRefs in the policy don't have an associated creation timestamp, but can still refer
+	// to targets that were already found via the selectors. Only add them to the returned list if
+	// they are not yet there. Always add them at the end.
+	fastLookup := sets.New(ret...)
+	var emptyTargetRef gwapiv1a2.LocalPolicyTargetReferenceWithSectionName
+	for _, v := range policy.GetTargetRefs() {
+		if v == emptyTargetRef {
+			// This can happen when the targetRef structure is read from extension server policies
+			continue
+		}
+		namespacedRef := NamespacedPolicyTargetReferenceWithSectionName{
+			LocalPolicyTargetReferenceWithSectionName: v,
+			Namespace: policyNamespace,
+		}
+		if !fastLookup.Has(namespacedRef) {
+			ret = append(ret, namespacedRef)
+		}
+	}
+
+	return ret
+}
+
 func getPolicyTargetRefs[T client.Object](policy egv1a1.PolicyTargetReferences, potentialTargets []T) []gwapiv1a2.LocalPolicyTargetReferenceWithSectionName {
 	dedup := sets.New[targetRefWithTimestamp]()
 	for _, currSelector := range policy.TargetSelectors {

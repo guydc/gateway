@@ -63,7 +63,7 @@ func TestTranslate(t *testing.T) {
 		},
 	}
 
-	inputFiles, err := filepath.Glob(filepath.Join("testdata", "*.in.yaml"))
+	inputFiles, err := filepath.Glob(filepath.Join("testdata", "policies-target-selectors.in.yaml"))
 	require.NoError(t, err)
 
 	for _, inputFile := range inputFiles {

@@ -92,6 +92,7 @@ func (t *Translator) ProcessSecurityPolicies(securityPolicies []*egv1a1.Security
 	// Process the policies targeting xRoutes
 	for _, currPolicy := range securityPolicies {
 		policyName := utils.NamespacedName(currPolicy)
+		//targetRefs := getPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, routes, currPolicy.Namespace)
 		targetRefs := getPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, routes)
 		for _, currTarget := range targetRefs {
 			if currTarget.Kind != resource.KindGateway {
@@ -181,6 +182,7 @@ func (t *Translator) ProcessSecurityPolicies(securityPolicies []*egv1a1.Security
 	// Process the policies targeting Gateways
 	for _, currPolicy := range securityPolicies {
 		policyName := utils.NamespacedName(currPolicy)
+		// targetRefs := getPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, gateways, currPolicy.Namespace)
 		targetRefs := getPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, gateways)
 		for _, currTarget := range targetRefs {
 			if currTarget.Kind == resource.KindGateway {
