@@ -554,7 +554,7 @@ func getNamespacedPolicyTargetRefs[T client.Object](policy egv1a1.PolicyTargetRe
 				continue
 			}
 
-			if obj.GetNamespace() != policyNamespace &&  (currSelector.NamespaceSelector == nil || !currSelector.NamespaceSelector.Any) {
+			if obj.GetNamespace() != policyNamespace &&  (currSelector.Namespaces == nil || currSelector.Namespaces.FromNamespaces != egv1a1.FromNamespacesAll) {
 					continue
 			}
 

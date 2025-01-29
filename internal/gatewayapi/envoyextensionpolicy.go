@@ -75,8 +75,7 @@ func (t *Translator) ProcessEnvoyExtensionPolicies(envoyExtensionPolicies []*egv
 	// Process the policies targeting xRoutes
 	for _, currPolicy := range envoyExtensionPolicies {
 		policyName := utils.NamespacedName(currPolicy)
-		//targetRefs := getPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, routes, currPolicy.Namespace)
-		targetRefs := getPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, routes)
+		targetRefs := getNamespacedPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, routes, currPolicy.Namespace)
 		for _, currTarget := range targetRefs {
 			if currTarget.Kind != resource.KindGateway {
 				policy, found := handledPolicies[policyName]
@@ -87,7 +86,7 @@ func (t *Translator) ProcessEnvoyExtensionPolicies(envoyExtensionPolicies []*egv
 				}
 
 				// Negative statuses have already been assigned so its safe to skip
-				route, resolveErr := resolveEEPolicyRouteTargetRef(policy, currTarget, routeMap)
+				route, resolveErr := t.resolveEEPolicyRouteTargetRef(policy, currTarget, routeMap, resources)
 				if route == nil {
 					continue
 				}
@@ -150,8 +149,7 @@ func (t *Translator) ProcessEnvoyExtensionPolicies(envoyExtensionPolicies []*egv
 	// Process the policies targeting Gateways
 	for _, currPolicy := range envoyExtensionPolicies {
 		policyName := utils.NamespacedName(currPolicy)
-		// targetRefs := getPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, gateways, currPolicy.Namespace)
-		targetRefs := getPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, gateways)
+		targetRefs := getNamespacedPolicyTargetRefs(currPolicy.Spec.PolicyTargetReferences, gateways, currPolicy.Namespace)
 		for _, currTarget := range targetRefs {
 			if currTarget.Kind == resource.KindGateway {
 				policy, found := handledPolicies[policyName]
@@ -162,7 +160,7 @@ func (t *Translator) ProcessEnvoyExtensionPolicies(envoyExtensionPolicies []*egv
 				}
 
 				// Negative statuses have already been assigned so its safe to skip
-				gateway, resolveErr := resolveEEPolicyGatewayTargetRef(policy, currTarget, gatewayMap)
+				gateway, resolveErr := t.resolveEEPolicyGatewayTargetRef(policy, currTarget, gatewayMap, resources)
 				if gateway == nil {
 					continue
 				}
@@ -221,20 +219,52 @@ func (t *Translator) ProcessEnvoyExtensionPolicies(envoyExtensionPolicies []*egv
 		}
 	}
 
+	// When multiple ancestors exist, ensure that they are sorted to avoid changes in status
+	for _, currPolicy := range res {
+		sort.Slice(currPolicy.Status.Ancestors, func(i, j int) bool {
+			return string(currPolicy.Status.Ancestors[i].AncestorRef.Name) < string(currPolicy.Status.Ancestors[j].AncestorRef.Name)
+		})
+	}
+
 	return res
 }
 
-func resolveEEPolicyGatewayTargetRef(policy *egv1a1.EnvoyExtensionPolicy, target gwapiv1a2.LocalPolicyTargetReferenceWithSectionName, gateways map[types.NamespacedName]*policyGatewayTargetContext) (*GatewayContext, *status.PolicyResolveError) {
+func (t *Translator) resolveEEPolicyGatewayTargetRef(policy *egv1a1.EnvoyExtensionPolicy, target NamespacedPolicyTargetReferenceWithSectionName, gateways map[types.NamespacedName]*policyGatewayTargetContext, resources *resource.Resources) (*GatewayContext, *status.PolicyResolveError) {
 	// Check if the gateway exists
 	key := types.NamespacedName{
 		Name:      string(target.Name),
-		Namespace: policy.Namespace,
+		Namespace: target.Namespace,
 	}
 	gateway, ok := gateways[key]
 
 	// Gateway not found
 	if !ok {
 		return nil, nil
+	}
+
+	if policy.Namespace != target.Namespace {
+		if !t.validateCrossNamespaceRef(
+			crossNamespaceFrom{
+				group:     egv1a1.GroupName,
+				kind:      policy.Kind,
+				namespace: policy.Namespace,
+			},
+			crossNamespaceTo{
+				group:     string(target.Group),
+				kind:      string(target.Kind),
+				namespace: target.Namespace,
+				name:      string(target.Name),
+			},
+			resources.ReferenceGrants,
+		) {
+			message := fmt.Sprintf("Policy target of Gateway %s not permitted by any ReferenceGrant",
+				string(target.Name))
+
+			return gateway.GatewayContext, &status.PolicyResolveError{
+				Reason:  gwapiv1a2.PolicyReasonInvalid,
+				Message: message,
+			}
+		}
 	}
 
 	// Check if another policy targeting the same Gateway exists
@@ -255,18 +285,44 @@ func resolveEEPolicyGatewayTargetRef(policy *egv1a1.EnvoyExtensionPolicy, target
 	return gateway.GatewayContext, nil
 }
 
-func resolveEEPolicyRouteTargetRef(policy *egv1a1.EnvoyExtensionPolicy, target gwapiv1a2.LocalPolicyTargetReferenceWithSectionName, routes map[policyTargetRouteKey]*policyRouteTargetContext) (RouteContext, *status.PolicyResolveError) {
+func (t *Translator) resolveEEPolicyRouteTargetRef(policy *egv1a1.EnvoyExtensionPolicy, target NamespacedPolicyTargetReferenceWithSectionName, routes map[policyTargetRouteKey]*policyRouteTargetContext, resources *resource.Resources) (RouteContext, *status.PolicyResolveError) {
 	// Check if the route exists
 	key := policyTargetRouteKey{
 		Kind:      string(target.Kind),
 		Name:      string(target.Name),
-		Namespace: policy.Namespace,
+		Namespace: target.Namespace,
 	}
 
 	route, ok := routes[key]
 	// Route not found
 	if !ok {
 		return nil, nil
+	}
+
+	// check if the cross-namespace reference is permitted
+	if policy.Namespace != target.Namespace {
+		if !t.validateCrossNamespaceRef(
+			crossNamespaceFrom{
+				group:     egv1a1.GroupName,
+				kind:      policy.Kind,
+				namespace: policy.Namespace,
+			},
+			crossNamespaceTo{
+				group:     string(target.Group),
+				kind:      string(target.Kind),
+				namespace: target.Namespace,
+				name:      string(target.Name),
+			},
+			resources.ReferenceGrants,
+		) {
+			message := fmt.Sprintf("Policy target of Route %s not permitted by any ReferenceGrant",
+				string(target.Name))
+
+			return route.RouteContext, &status.PolicyResolveError{
+				Reason:  gwapiv1a2.PolicyReasonInvalid,
+				Message: message,
+			}
+		}
 	}
 
 	// Check if another policy targeting the same xRoute exists
@@ -346,7 +402,7 @@ func (t *Translator) translateEnvoyExtensionPolicyForRoute(
 
 func (t *Translator) translateEnvoyExtensionPolicyForGateway(
 	policy *egv1a1.EnvoyExtensionPolicy,
-	target gwapiv1a2.LocalPolicyTargetReferenceWithSectionName,
+	target NamespacedPolicyTargetReferenceWithSectionName,
 	gateway *GatewayContext,
 	xdsIR resource.XdsIRMap,
 	resources *resource.Resources,

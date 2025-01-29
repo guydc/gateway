@@ -204,7 +204,6 @@ func (t *Translator) ProcessBackendTrafficPolicies(resources *resource.Resources
 					routes := r.UnsortedList()
 					sort.Strings(routes)
 					message := fmt.Sprintf("This policy is being overridden by other backendTrafficPolicies for these routes: %v", routes)
-
 					status.SetConditionForPolicyAncestors(&policy.Status,
 						ancestorRefs,
 						t.GatewayControllerName,
@@ -217,6 +216,13 @@ func (t *Translator) ProcessBackendTrafficPolicies(resources *resource.Resources
 				}
 			}
 		}
+	}
+
+	// When multiple ancestors exist, ensure that they are sorted to avoid changes in status
+	for _, currPolicy := range res {
+		sort.Slice(currPolicy.Status.Ancestors, func(i, j int) bool {
+			return string(currPolicy.Status.Ancestors[i].AncestorRef.Name) < string(currPolicy.Status.Ancestors[j].AncestorRef.Name)
+		})
 	}
 
 	return res

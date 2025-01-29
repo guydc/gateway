@@ -11,8 +11,8 @@ backendTrafficPolicies:
       kind: HTTPRoute
       matchLabels:
         group: 21s
-      namespaceSelector:
-        any: true
+      namespaces:
+        from: All
     timeout:
       tcp:
         connectTimeout: 21s
@@ -56,8 +56,8 @@ backendTrafficPolicies:
       kind: GRPCRoute
       matchLabels:
         group: 22s
-      namespaceSelector:
-        any: true
+      namespaces:
+        from: All
     timeout:
       tcp:
         connectTimeout: 22s
@@ -101,8 +101,8 @@ backendTrafficPolicies:
       kind: HTTPRoute
       matchLabels:
         group: 21s
-      namespaceSelector:
-        any: true
+      namespaces:
+        from: All
     timeout:
       tcp:
         connectTimeout: 10s
@@ -146,31 +146,13 @@ backendTrafficPolicies:
       kind: Gateway
       matchLabels:
         group: 1s
-      namespaceSelector:
-        any: true
+      namespaces:
+        from: All
     timeout:
       tcp:
         connectTimeout: 1s
   status:
     ancestors:
-    - ancestorRef:
-        group: gateway.networking.k8s.io
-        kind: Gateway
-        name: gateway-2
-        namespace: envoy-gateway
-      conditions:
-      - lastTransitionTime: null
-        message: Policy has been accepted.
-        reason: Accepted
-        status: "True"
-        type: Accepted
-      - lastTransitionTime: null
-        message: 'This policy is being overridden by other backendTrafficPolicies
-          for these routes: [default/httproute-2]'
-        reason: Overridden
-        status: "True"
-        type: Overridden
-      controllerName: gateway.envoyproxy.io/gatewayclass-controller
     - ancestorRef:
         group: gateway.networking.k8s.io
         kind: Gateway
@@ -189,6 +171,24 @@ backendTrafficPolicies:
         status: "True"
         type: Overridden
       controllerName: gateway.envoyproxy.io/gatewayclass-controller
+    - ancestorRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: gateway-2
+        namespace: envoy-gateway
+      conditions:
+      - lastTransitionTime: null
+        message: Policy has been accepted.
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      - lastTransitionTime: null
+        message: 'This policy is being overridden by other backendTrafficPolicies
+          for these routes: [default/httproute-2]'
+        reason: Overridden
+        status: "True"
+        type: Overridden
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
 - apiVersion: gateway.envoyproxy.io/v1alpha1
   kind: BackendTrafficPolicy
   metadata:
@@ -201,8 +201,8 @@ backendTrafficPolicies:
       kind: Gateway
       matchLabels:
         group: 2s
-      namespaceSelector:
-        any: true
+      namespaces:
+        from: All
     timeout:
       tcp:
         connectTimeout: 2s
@@ -256,8 +256,8 @@ backendTrafficPolicies:
       kind: Gateway
       matchLabels:
         group: 1s
-      namespaceSelector:
-        any: true
+      namespaces:
+        from: All
     timeout:
       tcp:
         connectTimeout: 10s
@@ -301,8 +301,8 @@ backendTrafficPolicies:
       kind: Gateway
       matchLabels:
         group: 1s
-      namespaceSelector:
-        any: true
+      namespaces:
+        from: All
     timeout:
       tcp:
         connectTimeout: 10s

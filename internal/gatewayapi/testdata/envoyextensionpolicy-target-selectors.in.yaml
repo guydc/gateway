@@ -5,7 +5,7 @@ gateways:
       namespace: envoy-gateway
       name: gateway-1
       labels:
-        group: 1s
+        group: wasm-1
     spec:
       gatewayClassName: envoy-gateway-class
       listeners:
@@ -21,7 +21,7 @@ gateways:
       namespace: envoy-gateway
       name: gateway-2
       labels:
-        group: 1s
+        group: wasm-1
     spec:
       gatewayClassName: envoy-gateway-class
       listeners:
@@ -37,7 +37,7 @@ gateways:
       namespace: envoy-gateway
       name: gateway-3
       labels:
-        group: 2s
+        group: wasm-2
     spec:
       gatewayClassName: envoy-gateway-class
       listeners:
@@ -53,7 +53,7 @@ gateways:
       namespace: envoy-gateway
       name: gateway-4
       labels:
-        group: 2s
+        group: wasm-2
     spec:
       gatewayClassName: envoy-gateway-class
       listeners:
@@ -151,9 +151,9 @@ httpRoutes:
             - group: gateway.envoyproxy.io
               kind: Backend
               name: backend-fqdn
-backendTrafficPolicies:
+envoyExtensionPolicies:
   - apiVersion: gateway.envoyproxy.io/v1alpha1
-    kind: BackendTrafficPolicy
+    kind: EnvoyExtensionPolicy
     metadata:
       namespace: policies
       name: policy-for-gateway-1s
@@ -162,12 +162,16 @@ backendTrafficPolicies:
         - group: gateway.networking.k8s.io
           kind: Gateway
           matchLabels:
-            group: 1s
-          namespaceSelector:
-            any: true
-      timeout:
-        tcp:
-          connectTimeout: 1s
+            group: wasm-1
+          namespaces:
+            from: All
+      wasm:
+      - name: wasm-filter-1
+        code:
+          type: HTTP
+          http:
+            url: https://www.example.com/wasm-filter-1.wasm
+            sha256: 2d89c4c6ab2a1c615c7696ed37ade9e50654ac70384b5d45100eb08e62130ff4
   - apiVersion: gateway.envoyproxy.io/v1alpha1
     kind: BackendTrafficPolicy
     metadata:
@@ -178,135 +182,139 @@ backendTrafficPolicies:
         - group: gateway.networking.k8s.io
           kind: Gateway
           matchLabels:
-            group: 2s
-          namespaceSelector:
-            any: true
-      timeout:
-        tcp:
-          connectTimeout: 2s
-  - apiVersion: gateway.envoyproxy.io/v1alpha1
-    kind: BackendTrafficPolicy
-    metadata:
-      namespace: policies
-      name: policy-for-gateway-1s-fail-override
-    spec:
-      targetSelectors:
-        - group: gateway.networking.k8s.io
-          kind: Gateway
-          matchLabels:
-            group: 1s
-          namespaceSelector:
-            any: true
-      timeout:
-        tcp:
-          connectTimeout: 10s
-  - apiVersion: gateway.envoyproxy.io/v1alpha1
-    kind: BackendTrafficPolicy
-    metadata:
-      namespace: policies
-      name: policy-for-gateway-no-namespace-selector-ignored
-    spec:
-      targetSelectors:
-        - group: gateway.networking.k8s.io
-          kind: Gateway
-          matchLabels:
-            group: 1s
-      timeout:
-        tcp:
-          connectTimeout: 10s
-  - apiVersion: gateway.envoyproxy.io/v1alpha1
-    kind: BackendTrafficPolicy
-    metadata:
-      namespace: policies-no-refgrant
-      name: policy-for-gateway-no-refgrant
-    spec:
-      targetSelectors:
-        - group: gateway.networking.k8s.io
-          kind: Gateway
-          matchLabels:
-            group: 1s
-          namespaceSelector:
-            any: true
-      timeout:
-        tcp:
-          connectTimeout: 10s
-  - apiVersion: gateway.envoyproxy.io/v1alpha1
-    kind: BackendTrafficPolicy
-    metadata:
-      namespace: policies
-      name: policy-for-route-override-21s
-    spec:
-      targetSelectors:
-        - group: gateway.networking.k8s.io
-          kind: HTTPRoute
-          matchLabels:
-            group: 21s
-          namespaceSelector:
-            any: true
-      timeout:
-        tcp:
-          connectTimeout: 21s
-  - apiVersion: gateway.envoyproxy.io/v1alpha1
-    kind: BackendTrafficPolicy
-    metadata:
-      namespace: policies
-      name: policy-for-route-override-22s
-    spec:
-      targetSelectors:
-        - group: gateway.networking.k8s.io
-          kind: GRPCRoute
-          matchLabels:
-            group: 22s
-          namespaceSelector:
-            any: true
-      timeout:
-        tcp:
-          connectTimeout: 22s
-  - apiVersion: gateway.envoyproxy.io/v1alpha1
-    kind: BackendTrafficPolicy
-    metadata:
-      namespace: policies-no-refgrant
-      name: policy-for-routes-no-refgrant
-    spec:
-      targetSelectors:
-        - group: gateway.networking.k8s.io
-          kind: HTTPRoute
-          matchLabels:
-            group: 21s
-          namespaceSelector:
-            any: true
-      timeout:
-        tcp:
-          connectTimeout: 10s
+            group: wasm-filter-2
+          namespaces:
+            from: All
+      wasm:
+      - name: wasm-filter-2
+        code:
+          type: HTTP
+          http:
+            url: https://www.example.com/wasm-filter-2.wasm
+            sha256: 2d89c4c6ab2a1c615c7696ed37ade9e50654ac70384b5d45100eb08e62130ff4
+#  - apiVersion: gateway.envoyproxy.io/v1alpha1
+#    kind: BackendTrafficPolicy
+#    metadata:
+#      namespace: policies
+#      name: policy-for-gateway-1s-fail-override
+#    spec:
+#      targetSelectors:
+#        - group: gateway.networking.k8s.io
+#          kind: Gateway
+#          matchLabels:
+#            group: 1s
+#          namespaces:
+#            from: All
+#      timeout:
+#        tcp:
+#          connectTimeout: 10s
+#  - apiVersion: gateway.envoyproxy.io/v1alpha1
+#    kind: BackendTrafficPolicy
+#    metadata:
+#      namespace: policies
+#      name: policy-for-gateway-no-namespace-selector-ignored
+#    spec:
+#      targetSelectors:
+#        - group: gateway.networking.k8s.io
+#          kind: Gateway
+#          matchLabels:
+#            group: 1s
+#      timeout:
+#        tcp:
+#          connectTimeout: 10s
+#  - apiVersion: gateway.envoyproxy.io/v1alpha1
+#    kind: BackendTrafficPolicy
+#    metadata:
+#      namespace: policies-no-refgrant
+#      name: policy-for-gateway-no-refgrant
+#    spec:
+#      targetSelectors:
+#        - group: gateway.networking.k8s.io
+#          kind: Gateway
+#          matchLabels:
+#            group: 1s
+#          namespaces:
+#            from: All
+#      timeout:
+#        tcp:
+#          connectTimeout: 10s
+#  - apiVersion: gateway.envoyproxy.io/v1alpha1
+#    kind: BackendTrafficPolicy
+#    metadata:
+#      namespace: policies
+#      name: policy-for-route-override-21s
+#    spec:
+#      targetSelectors:
+#        - group: gateway.networking.k8s.io
+#          kind: HTTPRoute
+#          matchLabels:
+#            group: 21s
+#          namespaces:
+#            from: All
+#      timeout:
+#        tcp:
+#          connectTimeout: 21s
+#  - apiVersion: gateway.envoyproxy.io/v1alpha1
+#    kind: BackendTrafficPolicy
+#    metadata:
+#      namespace: policies
+#      name: policy-for-route-override-22s
+#    spec:
+#      targetSelectors:
+#        - group: gateway.networking.k8s.io
+#          kind: GRPCRoute
+#          matchLabels:
+#            group: 22s
+#          namespaces:
+#            from: All
+#      timeout:
+#        tcp:
+#          connectTimeout: 22s
+#  - apiVersion: gateway.envoyproxy.io/v1alpha1
+#    kind: BackendTrafficPolicy
+#    metadata:
+#      namespace: policies-no-refgrant
+#      name: policy-for-routes-no-refgrant
+#    spec:
+#      targetSelectors:
+#        - group: gateway.networking.k8s.io
+#          kind: HTTPRoute
+#          matchLabels:
+#            group: 21s
+#          namespaces:
+#            from: All
+#      timeout:
+#        tcp:
+#          connectTimeout: 10s
 referenceGrants:
   - apiVersion: gateway.networking.k8s.io/v1alpha2
     kind: ReferenceGrant
     metadata:
-      name: refg-btp-gws
+      name: refg-eep-gws
       namespace: envoy-gateway
     spec:
       from:
         - group: gateway.envoyproxy.io
-          kind: BackendTrafficPolicy
+          kind: EnvoyExtensionPolicy
           namespace: policies
       to:
         - group: gateway.networking.k8s.io
           kind: Gateway
-  - apiVersion: gateway.networking.k8s.io/v1alpha2
-    kind: ReferenceGrant
-    metadata:
-      name: refg-btp-routes
-      namespace: default
-    spec:
-      from:
-        - group: gateway.envoyproxy.io
-          kind: BackendTrafficPolicy
-          namespace: policies
-      to:
-        - group: gateway.networking.k8s.io
-          kind: HTTPRoute
-        - group: gateway.networking.k8s.io
-          kind: GRPCRoute
+#  - apiVersion: gateway.networking.k8s.io/v1alpha2
+#    kind: ReferenceGrant
+#    metadata:
+#      name: refg-btp-routes
+#      namespace: default
+#    spec:
+#      from:
+#        - group: gateway.envoyproxy.io
+#          kind: BackendTrafficPolicy
+#          namespace: policies
+#      to:
+#        - group: gateway.networking.k8s.io
+#          kind: HTTPRoute
+#        - group: gateway.networking.k8s.io
+#          kind: GRPCRoute
 backends:
   - apiVersion: gateway.envoyproxy.io/v1alpha1
     kind: Backend
