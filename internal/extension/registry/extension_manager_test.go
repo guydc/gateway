@@ -10,24 +10,23 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
+	"github.com/envoyproxy/gateway/internal/envoygateway"
 	"github.com/envoyproxy/gateway/proto/extension"
+	v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"math"
 	"net"
 	"os"
+	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"testing"
-
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/ptr"
-	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
-	"github.com/envoyproxy/gateway/internal/envoygateway"
 
 	"os/exec"
 )
@@ -182,11 +181,17 @@ func generateTestCertFiles(t *testing.T, caFile, certFile, keyFile string) {
 		"-out", certFile+".csr")
 
 	run("openssl", "x509", "-req", "-in", certFile+".csr", "-CA", caFile, "-CAkey", caFile+".key",
-		"-CAcreateserial", "-out", certFile, "-days", "3650", "-sha256")
+		"-CAcreateserial", "-out", certFile, "-days", "3650", "-sha256", "-extfile", "openssl.conf", "-extensions", "v3_req")
 }
 
 type testServer struct {
 	extension.UnimplementedEnvoyGatewayExtensionServer
+}
+
+func (s *testServer) PostRouteModify(ctx context.Context, req *extension.PostRouteModifyRequest) (*extension.PostRouteModifyResponse, error) {
+	return &extension.PostRouteModifyResponse{
+		Route: req.Route,
+	}, nil
 }
 
 func Test_GetHook_TLS(t *testing.T) {
@@ -225,7 +230,7 @@ func Test_GetHook_TLS(t *testing.T) {
 		Service: &egv1a1.ExtensionService{
 			BackendEndpoint: egv1a1.BackendEndpoint{
 				IP: &egv1a1.IPEndpoint{
-					Address: testHost,
+					Address: "localhost",
 					Port:    int32(port),
 				},
 			},
@@ -273,4 +278,13 @@ func Test_GetHook_TLS(t *testing.T) {
 
 	client := extension.NewEnvoyGatewayExtensionClient(conn)
 	require.NotNil(t, client)
+
+	response, err := client.PostRouteModify(context.Background(), &extension.PostRouteModifyRequest{
+		Route: &v3.Route{
+			Name: "test-route",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, response.Route.Name, "test-route")
+
 }
