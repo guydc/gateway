@@ -458,6 +458,10 @@ xdsIR:
             endpoints:
             - host: 7.7.7.7
               port: 8080
+            metadata:
+              kind: HTTPRoute
+              name: httproute-1
+              namespace: envoy-gateway
             name: httproute/envoy-gateway/httproute-1/rule/0/backend/0
             protocol: HTTP
             weight: 1

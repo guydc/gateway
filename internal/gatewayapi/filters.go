@@ -32,7 +32,7 @@ type HTTPFiltersTranslator interface {
 	processRedirectFilter(redirect *gwapiv1.HTTPRequestRedirectFilter, filterContext *HTTPFiltersContext)
 	processRequestHeaderModifierFilter(headerModifier *gwapiv1.HTTPHeaderFilter, filterContext *HTTPFiltersContext)
 	processResponseHeaderModifierFilter(headerModifier *gwapiv1.HTTPHeaderFilter, filterContext *HTTPFiltersContext)
-	processRequestMirrorFilter(filterIdx int, mirror *gwapiv1.HTTPRequestMirrorFilter, filterContext *HTTPFiltersContext, resources *resource.Resources) status.Error
+	processRequestMirrorFilter(filterIdx int, ruleName *gwapiv1.SectionName, mirror *gwapiv1.HTTPRequestMirrorFilter, filterContext *HTTPFiltersContext, resources *resource.Resources) status.Error
 	processUnsupportedHTTPFilter(filterType string, filterContext *HTTPFiltersContext)
 }
 
@@ -67,12 +67,7 @@ type HTTPFilterIR struct {
 }
 
 // ProcessHTTPFilters translates gateway api http filters to IRs.
-func (t *Translator) ProcessHTTPFilters(parentRef *RouteParentContext,
-	route RouteContext,
-	filters []gwapiv1.HTTPRouteFilter,
-	ruleIdx int,
-	resources *resource.Resources,
-) (*HTTPFiltersContext, status.Error) {
+func (t *Translator) ProcessHTTPFilters(parentRef *RouteParentContext, route RouteContext, ruleName *gwapiv1.SectionName, filters []gwapiv1.HTTPRouteFilter, ruleIdx int, resources *resource.Resources, ) (*HTTPFiltersContext, status.Error) {
 	httpFiltersContext := &HTTPFiltersContext{
 		ParentRef:    parentRef,
 		Route:        route,
@@ -101,7 +96,7 @@ func (t *Translator) ProcessHTTPFilters(parentRef *RouteParentContext,
 		case gwapiv1.HTTPRouteFilterResponseHeaderModifier:
 			t.processResponseHeaderModifierFilter(filter.ResponseHeaderModifier, httpFiltersContext)
 		case gwapiv1.HTTPRouteFilterRequestMirror:
-			err = t.processRequestMirrorFilter(i, filter.RequestMirror, httpFiltersContext, resources)
+			err = t.processRequestMirrorFilter(i, ruleName, filter.RequestMirror, httpFiltersContext, resources)
 		case gwapiv1.HTTPRouteFilterCORS:
 			t.processCORSFilter(filter.CORS, httpFiltersContext)
 		case gwapiv1.HTTPRouteFilterExtensionRef:
@@ -117,6 +112,7 @@ func (t *Translator) ProcessHTTPFilters(parentRef *RouteParentContext,
 // ProcessGRPCFilters translates gateway api grpc filters to IRs.
 func (t *Translator) ProcessGRPCFilters(parentRef *RouteParentContext,
 	route RouteContext,
+	ruleName *gwapiv1.SectionName,
 	filters []gwapiv1.GRPCRouteFilter,
 	resources *resource.Resources,
 ) (*HTTPFiltersContext, error) {
@@ -144,7 +140,7 @@ func (t *Translator) ProcessGRPCFilters(parentRef *RouteParentContext,
 		case gwapiv1.GRPCRouteFilterResponseHeaderModifier:
 			t.processResponseHeaderModifierFilter(filter.ResponseHeaderModifier, httpFiltersContext)
 		case gwapiv1.GRPCRouteFilterRequestMirror:
-			err := t.processRequestMirrorFilter(i, filter.RequestMirror, httpFiltersContext, resources)
+			err := t.processRequestMirrorFilter(i, ruleName, filter.RequestMirror, httpFiltersContext, resources)
 			if err != nil {
 				return nil, err
 			}
@@ -878,6 +874,7 @@ func (t *Translator) processExtensionRefHTTPFilter(extFilter *gwapiv1.LocalObjec
 
 func (t *Translator) processRequestMirrorFilter(
 	filterIdx int,
+	ruleName *gwapiv1.SectionName,
 	mirrorFilter *gwapiv1.HTTPRequestMirrorFilter,
 	filterContext *HTTPFiltersContext,
 	resources *resource.Resources,
@@ -910,7 +907,7 @@ func (t *Translator) processRequestMirrorFilter(
 
 	destName := fmt.Sprintf("%s-mirror-%d", irRouteDestinationName(filterContext.Route, filterContext.RuleIdx), filterIdx)
 	settingName := irDestinationSettingName(destName, -1 /*unused*/)
-	ds, err := t.processDestination(settingName, mirrorBackendRef, filterContext.ParentRef, filterContext.Route, resources)
+	ds, err := t.processDestination(settingName, mirrorBackendRef, filterContext.ParentRef, filterContext.Route, ruleName, resources)
 	if err != nil {
 		return err
 	}
