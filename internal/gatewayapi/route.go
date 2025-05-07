@@ -1643,6 +1643,9 @@ func applyHTTPFiltersContextToDestinationFilters(httpFiltersContext *HTTPFilters
 	if httpFiltersContext.CredentialInjection != nil {
 		destFilters.CredentialInjection = httpFiltersContext.CredentialInjection
 	}
+	if httpFiltersContext.ExtensionRefs != nil {
+		destFilters.ExtensionRefs = httpFiltersContext.ExtensionRefs
+	}
 }
 
 func inspectAppProtocolByRouteKind(kind gwapiv1.Kind) ir.AppProtocol {

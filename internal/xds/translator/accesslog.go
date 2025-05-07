@@ -600,7 +600,7 @@ func processClusterForAccessLog(tCtx *types.ResourceVersionTable, al *ir.AccessL
 		if traffic == nil {
 			traffic = &ir.TrafficFeatures{}
 		}
-		if err := addXdsCluster(tCtx, &xdsClusterArgs{
+		if _, err := addXdsCluster(tCtx, &xdsClusterArgs{
 			name:              als.Destination.Name,
 			settings:          als.Destination.Settings,
 			tSocket:           nil,
@@ -627,7 +627,7 @@ func processClusterForAccessLog(tCtx *types.ResourceVersionTable, al *ir.AccessL
 			traffic = &ir.TrafficFeatures{}
 		}
 
-		if err := addXdsCluster(tCtx, &xdsClusterArgs{
+		if _, err := addXdsCluster(tCtx, &xdsClusterArgs{
 			name:              otel.Destination.Name,
 			settings:          otel.Destination.Settings,
 			tSocket:           nil,

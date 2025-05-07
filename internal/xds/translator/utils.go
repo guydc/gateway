@@ -153,7 +153,8 @@ func createExtServiceXDSCluster(rd *ir.RouteDestination, traffic *ir.TrafficFeat
 	} else {
 		endpointType = EndpointTypeStatic
 	}
-	return addXdsCluster(tCtx, &xdsClusterArgs{
+
+	_, err := addXdsCluster(tCtx, &xdsClusterArgs{
 		name:              rd.Name,
 		settings:          rd.Settings,
 		tSocket:           tSocket,
@@ -168,6 +169,8 @@ func createExtServiceXDSCluster(rd *ir.RouteDestination, traffic *ir.TrafficFeat
 		dns:               traffic.DNS,
 		http2Settings:     traffic.HTTP2,
 	})
+
+	return err
 }
 
 // addClusterFromURL adds a cluster to the resource version table from the provided URL.
@@ -201,7 +204,8 @@ func addClusterFromURL(url string, tCtx *types.ResourceVersionTable) error {
 		clusterArgs.tSocket = tSocket
 	}
 
-	return addXdsCluster(tCtx, clusterArgs)
+	_, err = addXdsCluster(tCtx, clusterArgs)
+	return err
 }
 
 // determineIPFamily determines the IP family based on multiple destination settings

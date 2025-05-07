@@ -190,6 +190,38 @@ func processExtensionPostTranslationHook(tCtx *types.ResourceVersionTable, em *e
 	return nil
 }
 
+func processExtensionPostClusterHook(cluster *clusterv3.Cluster, extensionRefs []*ir.UnstructuredRef, em *extensionTypes.Manager) (*clusterv3.Cluster, error) {
+	// Do nothing unless there is an extension manager and the ir.HTTPRoute has extension filters
+	if em == nil || len(extensionRefs) == 0 {
+		return nil, nil
+	}
+
+	// Check if an extension want to modify the route that was just configured/created
+	extManager := *em
+	extClusterHookClient, err := extManager.GetPostXDSHookClient(egv1a1.XDSCluster)
+	if err != nil {
+		return nil, err
+	}
+	if extClusterHookClient == nil {
+		return nil, nil
+	}
+
+
+	unstructuredResources := make([]*unstructured.Unstructured, len(extensionRefs))
+	for refIdx, ref := range extensionRefs {
+		unstructuredResources[refIdx] = ref.Object
+	}
+	modifiedCluster, err := extClusterHookClient.PostClusterModifyHook(
+		cluster,
+		unstructuredResources,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return modifiedCluster, nil
+}
+
 func deepCopyPtr(src, dest interface{}) error {
 	if src == nil || dest == nil {
 		return errors.New("cannot deep copy nil pointer")

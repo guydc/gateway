@@ -366,7 +366,8 @@ func createOAuth2TokenEndpointCluster(tCtx *types.ResourceVersionTable,
 		clusterArgs.tSocket = tSocket
 	}
 
-	return addXdsCluster(tCtx, clusterArgs)
+	_, err = addXdsCluster(tCtx, clusterArgs)
+	return err
 }
 
 // createOAuth2Secrets creates OAuth2 client and HMAC secrets from the provided

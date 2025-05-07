@@ -706,13 +706,16 @@ func (t *Translator) createRateLimitServiceCluster(tCtx *types.ResourceVersionTa
 		return err
 	}
 
-	return addXdsCluster(tCtx, &xdsClusterArgs{
+	_, err = addXdsCluster(tCtx, &xdsClusterArgs{
 		name:         clusterName,
 		settings:     []*ir.DestinationSetting{ds},
 		tSocket:      tSocket,
 		endpointType: EndpointTypeDNS,
 		metrics:      metrics,
 	})
+
+	return err
+
 }
 
 func getDomainName(route *ir.HTTPRoute) string {

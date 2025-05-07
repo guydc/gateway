@@ -8,6 +8,7 @@ package translator
 import (
 	"errors"
 	"fmt"
+	resourceTypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"runtime"
 	"strings"
 	"time"
@@ -103,7 +104,7 @@ func (t *Translator) Translate(xdsIR *ir.Xds) (*types.ResourceVersionTable, erro
 		errs = errors.Join(errs, err)
 	}
 
-	if err := processUDPListenerXdsTranslation(tCtx, xdsIR.UDP, xdsIR.AccessLog, xdsIR.Metrics); err != nil {
+	if err := t.processUDPListenerXdsTranslation(tCtx, xdsIR.UDP, xdsIR.AccessLog, xdsIR.Metrics); err != nil {
 		errs = errors.Join(errs, err)
 	}
 
@@ -524,6 +525,7 @@ func (t *Translator) addRouteToRouteConfig(
 			// a regular xds Cluster
 			if !httpRoute.Destination.NeedsClusterPerSetting() {
 				err = processXdsCluster(
+					t,
 					tCtx,
 					httpRoute.Destination.Name,
 					httpRoute.Destination.Settings,
@@ -538,12 +540,7 @@ func (t *Translator) addRouteToRouteConfig(
 				// attached to the route, and create a xds Cluster per setting
 				for _, setting := range httpRoute.Destination.Settings {
 					tSettings := []*ir.DestinationSetting{setting}
-					err = processXdsCluster(
-						tCtx,
-						setting.Name,
-						tSettings,
-						&HTTPRouteTranslator{httpRoute},
-						ea)
+					err = processXdsCluster(t, tCtx, setting.Name, tSettings, &HTTPRouteTranslator{httpRoute}, ea)
 					if err != nil {
 						errs = errors.Join(errs, err)
 					}
@@ -558,7 +555,7 @@ func (t *Translator) addRouteToRouteConfig(
 		if httpRoute.Mirrors != nil {
 			for _, mrr := range httpRoute.Mirrors {
 				if mrr.Destination != nil {
-					if err = addXdsCluster(tCtx, &xdsClusterArgs{
+					if _, err = addXdsCluster(tCtx, &xdsClusterArgs{
 						name:         mrr.Destination.Name,
 						settings:     mrr.Destination.Settings,
 						tSocket:      nil,
@@ -686,11 +683,7 @@ func (t *Translator) processTCPListenerXdsTranslation(
 		patchProxyProtocolFilter(xdsListener, tcpListener.EnableProxyProtocol)
 
 		for _, route := range tcpListener.Routes {
-			if err := processXdsCluster(tCtx,
-				route.Destination.Name,
-				route.Destination.Settings,
-				&TCPRouteTranslator{route},
-				&ExtraArgs{metrics: metrics}); err != nil {
+			if err := processXdsCluster(t, tCtx, route.Destination.Name, route.Destination.Settings, &TCPRouteTranslator{route}, &ExtraArgs{metrics: metrics}); err != nil {
 				errs = errors.Join(errs, err)
 			}
 			if route.TLS != nil && route.TLS.Terminate != nil {
@@ -748,7 +741,7 @@ func (t *Translator) processTCPListenerXdsTranslation(
 	return errs
 }
 
-func processUDPListenerXdsTranslation(
+func (t *Translator) processUDPListenerXdsTranslation(
 	tCtx *types.ResourceVersionTable,
 	udpListeners []*ir.UDPListener,
 	accesslog *ir.AccessLog,
@@ -777,11 +770,7 @@ func processUDPListenerXdsTranslation(
 			}
 
 			// 1:1 between IR UDPRoute and xDS Cluster
-			if err := processXdsCluster(tCtx,
-				route.Destination.Name,
-				route.Destination.Settings,
-				&UDPRouteTranslator{route},
-				&ExtraArgs{metrics: metrics}); err != nil {
+			if err := processXdsCluster(t, tCtx, route.Destination.Name, route.Destination.Settings, &UDPRouteTranslator{route}, &ExtraArgs{metrics: metrics}); err != nil {
 				errs = errors.Join(errs, err)
 			}
 		}
@@ -873,14 +862,39 @@ func findXdsEndpoint(tCtx *types.ResourceVersionTable, name string) *endpointv3.
 	return nil
 }
 
-// processXdsCluster processes xds cluster with args per route.
-func processXdsCluster(tCtx *types.ResourceVersionTable,
-	name string,
-	settings []*ir.DestinationSetting,
-	route clusterArgs,
-	extras *ExtraArgs,
-) error {
-	return addXdsCluster(tCtx, route.asClusterArgs(name, settings, extras))
+// processXdsCluster processes xds cluster with args per route and notifies extension server about the cluster
+func processXdsCluster(t *Translator, tCtx *types.ResourceVersionTable, name string, settings []*ir.DestinationSetting, route clusterArgs, extras *ExtraArgs, ) error {
+	xdsCluster, err := addXdsCluster(tCtx, route.asClusterArgs(name, settings, extras))
+
+	var extensionRefs []*ir.UnstructuredRef
+
+	for _, setting := range settings {
+		if setting.Filters != nil && setting.Filters.ExtensionRefs != nil {
+			extensionRefs = append(extensionRefs, setting.Filters.ExtensionRefs...)
+		}
+	}
+
+	if len(extensionRefs) > 0 {
+		newCluster, err := processExtensionPostClusterHook(xdsCluster, extensionRefs, t.ExtensionManager)
+		if err != nil {
+			return err
+		}
+
+		tCtx.AddOrReplaceXdsResource(resourcev3.ClusterType, newCluster, func(existing, new resourceTypes.Resource) bool {
+			oldListener := existing.(*listenerv3.Listener)
+			newListener := new.(*listenerv3.Listener)
+			if newListener == nil || oldListener == nil {
+				return false
+			}
+			if oldListener.Name == newListener.Name {
+				return true
+			}
+			return false
+		})
+	}
+
+
+	return err
 }
 
 // findXdsSecret finds a xds secret with the same name, and returns nil if there is no match.
@@ -915,18 +929,18 @@ func addXdsSecret(tCtx *types.ResourceVersionTable, secret *tlsv3.Secret) error 
 
 // addXdsCluster adds a xds cluster with args.
 // If the cluster already exists, it skips adding the cluster and returns nil.
-func addXdsCluster(tCtx *types.ResourceVersionTable, args *xdsClusterArgs) error {
+func addXdsCluster(tCtx *types.ResourceVersionTable, args *xdsClusterArgs) (*clusterv3.Cluster, error) {
 	// Return early if cluster with the same name exists.
 	// All the current callers can all safely assume the xdsClusterArgs is the same for the clusters with the same name.
 	// If this assumption changes, the callers should call findXdsCluster first to check if the cluster already exists
 	// before calling addXdsCluster.
 	if c := findXdsCluster(tCtx, args.name); c != nil {
-		return nil
+		return nil, nil
 	}
 
 	result, err := buildXdsCluster(args)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	xdsCluster := result.cluster
 	xdsEndpoints := buildXdsClusterLoadAssignment(args.name, args.settings)
@@ -935,7 +949,7 @@ func addXdsCluster(tCtx *types.ResourceVersionTable, args *xdsClusterArgs) error
 			// Create an SDS secret for the CA certificate - either with inline bytes or with a filesystem ref
 			secret := buildXdsUpstreamTLSCASecret(ds.TLS)
 			if err := tCtx.AddXdsResource(resourcev3.SecretType, secret); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
@@ -943,7 +957,7 @@ func addXdsCluster(tCtx *types.ResourceVersionTable, args *xdsClusterArgs) error
 	switch args.endpointType {
 	case EndpointTypeStatic:
 		if err := tCtx.AddXdsResource(resourcev3.EndpointType, xdsEndpoints); err != nil {
-			return err
+			return nil, err
 		}
 	case EndpointTypeDNS:
 		xdsCluster.LoadAssignment = xdsEndpoints
@@ -954,16 +968,17 @@ func addXdsCluster(tCtx *types.ResourceVersionTable, args *xdsClusterArgs) error
 	}
 
 	if err := tCtx.AddXdsResource(resourcev3.ClusterType, xdsCluster); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add the secrets used in the cluster filters. (Currently only used for Credential Injector filter)
 	for _, secret := range result.secrets {
 		if err := tCtx.AddXdsResource(resourcev3.SecretType, secret); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+
+	return result.cluster, nil
 }
 
 const (

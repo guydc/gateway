@@ -120,3 +120,26 @@ func (h *XDSHook) PostTranslateModifyHook(clusters []*cluster.Cluster, secrets [
 
 	return resp.Clusters, resp.Secrets, nil
 }
+
+func (h *XDSHook) PostClusterModifyHook(cluster *cluster.Cluster, extensionResources []*unstructured.Unstructured) (*cluster.Cluster, error) {
+	// Take all of the unstructured resources for the extension and package them into bytes
+	extensionResourceBytes, err := translateUnstructuredToUnstructuredBytes(extensionResources)
+	if err != nil {
+		return cluster, err
+	}
+
+	// Make the request to the extension server
+	ctx := context.Background()
+	resp, err := h.grpcClient.PostClusterModify(ctx,
+		&extension.PostClusterModifyRequest{
+			Cluster: cluster,
+			PostClusterContext: &extension.PostClusterExtensionContext{
+				ExtensionResources: extensionResourceBytes,
+			},
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Cluster, nil
+}
