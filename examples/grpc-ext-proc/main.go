@@ -209,6 +209,7 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 		resp := &envoy_service_proc_v3.ProcessingResponse{}
 		switch v := req.Request.(type) {
 		case *envoy_service_proc_v3.ProcessingRequest_RequestHeaders:
+			fmt.Printf("req: %+v\n", req)
 			xdsRouteName := ""
 
 			if req.Attributes != nil {
@@ -293,7 +294,7 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 				}
 			}
 			forwardedDynamicMetadata := ""
-			fmt.Printf("req: %+v\n", req)
+			//fmt.Printf("req: %+v\n", req)
 			if req.MetadataContext != nil && req.MetadataContext.FilterMetadata != nil {
 				if md, ok := req.MetadataContext.FilterMetadata["envoy.filters.http.rbac"]; ok {
 					if mdf, ok := md.Fields["enforced_engine_result"]; ok {

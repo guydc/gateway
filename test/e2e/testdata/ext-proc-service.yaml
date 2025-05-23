@@ -113,3 +113,80 @@ spec:
       port: 9002
       targetPort: 9002
       name: grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-ext-proc-2
+  namespace: gateway-conformance-infra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grpc-ext-proc-2
+  template:
+    metadata:
+      labels:
+        app: grpc-ext-proc-2
+    spec:
+      # Needed for UDS socket mount
+      # https://gateway.envoyproxy.io/docs/tasks/traffic/backend/#restrictions
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "gateway.envoyproxy.io/owning-gateway-name"
+                    operator: In
+                    values:
+                      - same-namespace
+                  - key: "app.kubernetes.io/component"
+                    operator: In
+                    values:
+                      - proxy
+              topologyKey: kubernetes.io/hostname
+              namespaceSelector: {}
+      containers:
+        - name: golang-app-container
+          image: envoyproxy/gateway-grpc-ext-proc:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --certPath=/app/certs/
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: grpc-ext-proc-secret
+              mountPath: /app/certs
+            - name: socket-dir
+              mountPath: /var/run/ext-proc/
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+      volumes:
+        - name: grpc-ext-proc-secret
+          secret:
+            secretName: grpc-ext-proc-secret
+            items:
+              - key: tls.crt
+                path: server.crt
+              - key: tls.key
+                path: server.key
+        - name: socket-dir
+          hostPath:
+            path: /var/run/ext-proc/
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-ext-proc-2
+  namespace: gateway-conformance-infra
+spec:
+  selector:
+    app: grpc-ext-proc-2
+  ports:
+    - protocol: TCP
+      port: 9002
+      targetPort: 9002
+      name: grpc
