@@ -272,10 +272,14 @@ func getBackendTLSBundle(backendTLSPolicy *gwapiv1a3.BackendTLSPolicy, resources
 	}
 
 	tlsBundle := &ir.TLSUpstreamConfig{
-		SNI:                 ptr.To(string(backendTLSPolicy.Spec.Validation.Hostname)),
 		UseSystemTrustStore: ptr.Deref(backendTLSPolicy.Spec.Validation.WellKnownCACertificates, "") == gwapiv1a3.WellKnownCACertificatesSystem,
 		SubjectAltNames:     subjectAltNames,
 	}
+
+	if _, found := backendTLSPolicy.Spec.Options["auto-sni"]; !found {
+		tlsBundle.SNI = ptr.To(string(backendTLSPolicy.Spec.Validation.Hostname))
+	}
+
 	if tlsBundle.UseSystemTrustStore {
 		tlsBundle.CACertificate = &ir.TLSCACertificate{
 			Name: fmt.Sprintf("%s/%s-ca", backendTLSPolicy.Name, backendTLSPolicy.Namespace),

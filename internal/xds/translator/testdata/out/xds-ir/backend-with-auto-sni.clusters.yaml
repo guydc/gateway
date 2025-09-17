@@ -29,7 +29,14 @@
       name: envoy.transport_sockets.tls
       typedConfig:
         '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        commonTlsContext: {}
+        commonTlsContext:
+          combinedValidationContext:
+            defaultValidationContext: {}
+            validationContextSdsSecretConfig:
+              name: policy-btls/backends-ca
+              sdsConfig:
+                ads: {}
+                resourceApiVersion: V3
   type: EDS
   typedExtensionProtocolOptions:
     envoy.extensions.upstreams.http.v3.HttpProtocolOptions:

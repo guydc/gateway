@@ -803,7 +803,21 @@ func buildTypedExtensionProtocolOptions(args *xdsClusterArgs) (map[string]*anypb
 
 	requiresHTTPFilters := len(args.settings) > 0 && args.settings[0].Filters != nil && args.settings[0].Filters.CredentialInjection != nil
 
-	if !requiresCommonHTTPOptions && !requiresHTTP1Options && !requiresHTTP2Options && !args.useClientProtocol && !requiresHTTPFilters {
+	// check if SNI is not set
+	hasSNI := false
+	hasTLS := false
+	for _, ds := range args.settings {
+		if ds.TLS != nil {
+			hasTLS = true
+			if ds.TLS.SNI != nil {
+				hasSNI = true
+			}
+		}
+	}
+
+	needsAutoSNI := hasTLS && !hasSNI
+
+	if !needsAutoSNI && !requiresCommonHTTPOptions && !requiresHTTP1Options && !requiresHTTP2Options && !args.useClientProtocol && !requiresHTTPFilters {
 		return nil, nil, nil
 	}
 
@@ -886,11 +900,16 @@ func buildTypedExtensionProtocolOptions(args *xdsClusterArgs) (map[string]*anypb
 		}
 	}
 
+
 	// Envoy proxy requires AutoSNI and AutoSanValidation to be set to true for dynamic_forward_proxy clusters
 	if args.endpointType == EndpointTypeDynamicResolver {
 		protocolOptions.UpstreamHttpProtocolOptions = &corev3.UpstreamHttpProtocolOptions{
 			AutoSni:           true,
 			AutoSanValidation: true,
+		}
+	} else if needsAutoSNI {
+		protocolOptions.UpstreamHttpProtocolOptions = &corev3.UpstreamHttpProtocolOptions{
+			AutoSni:           true,
 		}
 	}
 

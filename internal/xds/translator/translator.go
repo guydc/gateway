@@ -1229,6 +1229,7 @@ func buildXdsUpstreamTLSSocketWthCert(tlsConfig *ir.TLSUpstreamConfig) (*corev3.
 		tlsCtx.CommonTlsContext.ValidationContextType = buildValidationContext(tlsConfig)
 	}
 
+	// TLS-level SNI
 	if tlsConfig.SNI != nil {
 		tlsCtx.Sni = *tlsConfig.SNI
 	}
