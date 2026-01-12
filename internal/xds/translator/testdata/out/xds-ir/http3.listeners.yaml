@@ -36,6 +36,14 @@
         serverHeaderTransformation: PASS_THROUGH
         statPrefix: https-10443
         useRemoteAddress: true
+    metadata:
+      filterMetadata:
+        envoy-gateway:
+          resources:
+          - kind: Gateway
+            name: gateway-1
+            namespace: envoy-gateway
+            sectionName: https-wildcard
     name: envoy-gateway/gateway-1/https-wildcard
     transportSocket:
       name: envoy.transport_sockets.quic
@@ -86,6 +94,14 @@
         serverHeaderTransformation: PASS_THROUGH
         statPrefix: https-10443
         useRemoteAddress: true
+    metadata:
+      filterMetadata:
+        envoy-gateway:
+          resources:
+          - kind: Gateway
+            name: gateway-1
+            namespace: envoy-gateway
+            sectionName: https-foo
     name: envoy-gateway/gateway-1/https-foo
     transportSocket:
       name: envoy.transport_sockets.quic
@@ -136,6 +152,14 @@
         serverHeaderTransformation: PASS_THROUGH
         statPrefix: https-10443
         useRemoteAddress: true
+    metadata:
+      filterMetadata:
+        envoy-gateway:
+          resources:
+          - kind: Gateway
+            name: gateway-1
+            namespace: envoy-gateway
+            sectionName: https-bar
     name: envoy-gateway/gateway-1/https-bar
     transportSocket:
       name: envoy.transport_sockets.quic
@@ -193,6 +217,14 @@
         serverHeaderTransformation: PASS_THROUGH
         statPrefix: https-10443
         useRemoteAddress: true
+    metadata:
+      filterMetadata:
+        envoy-gateway:
+          resources:
+          - kind: Gateway
+            name: gateway-1
+            namespace: envoy-gateway
+            sectionName: https-wildcard
     name: envoy-gateway/gateway-1/https-wildcard
     transportSocket:
       name: envoy.transport_sockets.tls
@@ -240,6 +272,14 @@
         serverHeaderTransformation: PASS_THROUGH
         statPrefix: https-10443
         useRemoteAddress: true
+    metadata:
+      filterMetadata:
+        envoy-gateway:
+          resources:
+          - kind: Gateway
+            name: gateway-1
+            namespace: envoy-gateway
+            sectionName: https-foo
     name: envoy-gateway/gateway-1/https-foo
     transportSocket:
       name: envoy.transport_sockets.tls
@@ -287,6 +327,14 @@
         serverHeaderTransformation: PASS_THROUGH
         statPrefix: https-10443
         useRemoteAddress: true
+    metadata:
+      filterMetadata:
+        envoy-gateway:
+          resources:
+          - kind: Gateway
+            name: gateway-1
+            namespace: envoy-gateway
+            sectionName: https-bar
     name: envoy-gateway/gateway-1/https-bar
     transportSocket:
       name: envoy.transport_sockets.tls

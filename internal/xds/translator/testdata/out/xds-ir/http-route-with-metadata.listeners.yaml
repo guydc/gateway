@@ -29,6 +29,16 @@
         serverHeaderTransformation: PASS_THROUGH
         statPrefix: http-10080
         useRemoteAddress: true
+    metadata:
+      filterMetadata:
+        envoy-gateway:
+          resources:
+          - annotations:
+              foo: bar
+            kind: Gateway
+            name: first-gateway
+            namespace: first-gateway
+            sectionName: first-listener
     name: first-listener
   maxConnectionsToAcceptPerSocketEvent: 1
   name: first-listener

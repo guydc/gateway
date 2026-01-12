@@ -161,6 +161,14 @@ xds:
                 serverHeaderTransformation: PASS_THROUGH
                 statPrefix: http-10080
                 useRemoteAddress: true
+            metadata:
+              filterMetadata:
+                envoy-gateway:
+                  resources:
+                  - kind: Gateway
+                    name: eg
+                    namespace: envoy-gateway-system
+                    sectionName: http
             name: envoy-gateway-system/eg/http
           maxConnectionsToAcceptPerSocketEvent: 1
           name: envoy-gateway-system/eg/http

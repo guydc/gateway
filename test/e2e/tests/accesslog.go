@@ -86,9 +86,11 @@ var FileAccessLogTest = suite.ConformanceTest{
 		})
 
 		t.Run("Listener Logs", func(t *testing.T) {
+			// access log format: LISTENER ACCESS LOG %UPSTREAM_PROTOCOL% %RESPONSE_CODE% %METADATA(LISTENER_FILTER_CHAIN:envoy-gateway:resources)%
 			// Ensure that Listener is emitting the log: protocol and response code should be
 			// empty in listener logs as they are upstream L7 attributes
-			expectedMatch := "LISTENER ACCESS LOG - 0"
+			// filter chain metadata is the metadata for the same-namespace gateway
+			expectedMatch := "LISTENER ACCESS LOG - 0.*same-namespace.*"
 			ns := "gateway-conformance-infra"
 			routeNN := types.NamespacedName{Name: "accesslog-file", Namespace: ns}
 			gwNN := types.NamespacedName{Name: "same-namespace", Namespace: ns}

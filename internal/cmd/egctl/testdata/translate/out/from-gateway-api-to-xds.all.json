@@ -996,6 +996,20 @@
                         }
                       }
                     ],
+                    "metadata": {
+                      "filterMetadata": {
+                        "envoy-gateway": {
+                          "resources": [
+                            {
+                              "kind": "Gateway",
+                              "name": "eg",
+                              "namespace": "default",
+                              "sectionName": "http"
+                            }
+                          ]
+                        }
+                      }
+                    },
                     "name": "default/eg/http"
                   },
                   "maxConnectionsToAcceptPerSocketEvent": 1,
@@ -1148,6 +1162,20 @@
                         }
                       }
                     ],
+                    "metadata": {
+                      "filterMetadata": {
+                        "envoy-gateway": {
+                          "resources": [
+                            {
+                              "kind": "Gateway",
+                              "name": "eg",
+                              "namespace": "default",
+                              "sectionName": "grpc"
+                            }
+                          ]
+                        }
+                      }
+                    },
                     "name": "default/eg/grpc"
                   },
                   "maxConnectionsToAcceptPerSocketEvent": 1,

@@ -707,6 +707,20 @@
                         }
                       }
                     ],
+                    "metadata": {
+                      "filterMetadata": {
+                        "envoy-gateway": {
+                          "resources": [
+                            {
+                              "kind": "Gateway",
+                              "name": "eg",
+                              "namespace": "envoy-gateway-system",
+                              "sectionName": "http"
+                            }
+                          ]
+                        }
+                      }
+                    },
                     "name": "envoy-gateway-system/eg/http"
                   },
                   "maxConnectionsToAcceptPerSocketEvent": 1,

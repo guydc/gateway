@@ -363,6 +363,15 @@ func (t *Translator) processHTTPListenerXdsTranslation(
 			// route HTTP traffic to the correct virtual host for all the domains
 			// specified in the Gateway HTTP Listener's routes.
 			addHCM = !hasHCMInDefaultFilterChain(tcpXDSListener)
+
+			// When the DefaultFilterChain is shared by multiple Gateway HTTP
+			// Listeners, we need to avoid XDS metadata. The metadata would be unstable,
+			// as it would encode the first matching Gateway.
+			// A change to this gateway (e.g. removal) will lead to metadata change
+			// which will cause a drain impacting all Gateways sharing this filter chain.
+			if tcpXDSListener.DefaultFilterChain != nil {
+				tcpXDSListener.DefaultFilterChain.Metadata = nil
+			}
 		case xdsListenerOnSameAddressPortExists && tlsEnabled:
 			// If an existing xds listener exists, and Gateway HTTP Listener enables
 			// TLS, we need to create an HCM.

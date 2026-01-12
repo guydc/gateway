@@ -1141,6 +1141,14 @@ xds:
                   serverHeaderTransformation: PASS_THROUGH
                   statPrefix: http-10080
                   useRemoteAddress: true
+              metadata:
+                filterMetadata:
+                  envoy-gateway:
+                    resources:
+                    - kind: Gateway
+                      name: eg
+                      namespace: default
+                      sectionName: http
               name: default/eg/http
             maxConnectionsToAcceptPerSocketEvent: 1
             name: default/eg/http
@@ -1253,6 +1261,14 @@ xds:
                   serverHeaderTransformation: PASS_THROUGH
                   statPrefix: http-8080
                   useRemoteAddress: true
+              metadata:
+                filterMetadata:
+                  envoy-gateway:
+                    resources:
+                    - kind: Gateway
+                      name: eg
+                      namespace: default
+                      sectionName: grpc
               name: default/eg/grpc
             maxConnectionsToAcceptPerSocketEvent: 1
             name: default/eg/grpc

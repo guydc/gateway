@@ -455,8 +455,9 @@ func (t *Translator) addHCMToXDSListener(
 	}
 
 	filterChain := &listenerv3.FilterChain{
-		Name:    httpsListenerFilterChainName(irListener),
-		Filters: filters,
+		Name:     httpsListenerFilterChainName(irListener),
+		Filters:  filters,
+		Metadata: buildXdsMetadata(irListener.Metadata),
 	}
 
 	if irListener.TLS != nil {
