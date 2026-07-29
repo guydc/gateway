@@ -1,0 +1,43 @@
+http:
+- address: 0.0.0.0
+  hostnames:
+  - '*'
+  metadata:
+    kind: Gateway
+    name: gateway-1
+    namespace: envoy-gateway
+    sectionName: http
+  name: envoy-gateway/gateway-1/http
+  path:
+    escapedSlashesAction: UnescapeAndRedirect
+    mergeSlashes: true
+  port: 10080
+  routes:
+  - destination:
+      name: httproute/default/httproute-1/rule/0
+      settings:
+      - isDynamicResolver: true
+        dynamicResolverAddressFilter:
+          cidrMatches:
+          - cidr: 10.0.0.0/8
+            maskLen: 8
+            isIPv6: false
+          - cidr: 192.168.0.0/16
+            maskLen: 16
+            isIPv6: false
+          invert: false
+        name: httproute/default/httproute-1/rule/0/backend/0
+        protocol: HTTP
+        weight: 1
+    hostname: '*'
+    isHTTP2: false
+    metadata:
+      kind: HTTPRoute
+      name: httproute-1
+      namespace: default
+    name: httproute/default/httproute-1/rule/0/match/-1/all
+readyListener:
+  address: 0.0.0.0
+  ipFamily: IPv4
+  path: /ready
+  port: 19003

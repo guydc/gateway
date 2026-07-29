@@ -470,6 +470,7 @@ _Appears in:_
 | `appProtocols` | _[AppProtocolType](#appprotocoltype) array_ |  false  |  | AppProtocols defines the application protocols to be supported when connecting to the backend. |
 | `fallback` | _boolean_ |  false  |  | Fallback indicates whether the backend is designated as a fallback.<br />It is highly recommended to configure active or passive health checks to ensure that failover can be detected<br />when the active backends become unhealthy and to automatically readjust once the primary backends are healthy again.<br />The overprovisioning factor is set to 1.4, meaning the fallback backends will only start receiving traffic when<br />the health of the active backends falls below 72%. |
 | `tls` | _[BackendTLSSettings](#backendtlssettings)_ |  false  |  | TLS defines the TLS settings for the backend.<br />If TLS is specified here and a BackendTLSPolicy is also configured for the backend, the final TLS settings will<br />be a merge of both configurations. In case of overlapping fields, the values defined in the BackendTLSPolicy will<br />take precedence. |
+| `dynamicResolver` | _[DynamicResolverConfig](#dynamicresolverconfig)_ |  false  |  | DynamicResolver holds configuration specific to DynamicResolver-type backends.<br />Only valid when Type is DynamicResolver. |
 
 
 #### BackendStatus
@@ -814,6 +815,7 @@ A CIDR can be an IPv4 address range such as "192.168.1.0/24" or an IPv6 address 
 
 _Appears in:_
 - [Principal](#principal)
+- [ResolvedAddressFilter](#resolvedaddressfilter)
 - [XForwardedForSettings](#xforwardedforsettings)
 
 
@@ -1542,6 +1544,20 @@ _Appears in:_
 | ----- | ----------- |
 | `Local` | LocalDynamicModuleSourceType specifies a module loaded from the local filesystem.<br /> | 
 | `Remote` | RemoteDynamicModuleSourceType specifies a module fetched from a remote source.<br /> | 
+
+
+#### DynamicResolverConfig
+
+
+
+DynamicResolverConfig holds configuration specific to DynamicResolver-type backends.
+
+_Appears in:_
+- [BackendSpec](#backendspec)
+
+| Field | Type | Required | Default | Description |
+| ---   | ---  | ---      | ---     | ---         |
+| `resolvedAddressFilter` | _[ResolvedAddressFilter](#resolvedaddressfilter)_ |  false  |  | ResolvedAddressFilter filters IP addresses resolved from the Host/SNI header<br />before they are used to connect to the upstream. Addresses matching the filter<br />criteria are removed; if all resolved addresses are filtered out, the connection<br />attempt fails. This is primarily a security control to prevent SSRF and DNS<br />rebinding attacks by blocking resolution to private or internal IP ranges. |
 
 
 #### EndpointOverride
@@ -5596,6 +5612,22 @@ _Appears in:_
 | Field | Type | Required | Default | Description |
 | ---   | ---  | ---      | ---     | ---         |
 | `tracing` | _[RequestIDExtensionAction](#requestidextensionaction)_ |  false  |  | Tracing configures Envoy's behavior for the UUID request ID extension,<br />including whether the trace sampling decision is packed into the UUID and<br />whether `X-Request-ID` is used for trace sampling decisions.<br />When omitted, the default behavior is `PackAndSample`, which alters the UUID<br />to contain the trace sampling decision and uses `X-Request-ID` for stable<br />trace sampling. |
+
+
+#### ResolvedAddressFilter
+
+
+
+ResolvedAddressFilter defines CIDR-based filtering of resolved IP addresses
+for DynamicResolver backends.
+
+_Appears in:_
+- [DynamicResolverConfig](#dynamicresolverconfig)
+
+| Field | Type | Required | Default | Description |
+| ---   | ---  | ---      | ---     | ---         |
+| `cidrRanges` | _[CIDR](#cidr) array_ |  true  |  | CIDRRanges defines the IP address ranges to match against resolved addresses. |
+| `invert` | _boolean_ |  false  |  | Invert controls the filter direction:<br />- When false (default), addresses IN the CIDRRanges are filtered out (block-list).<br />  Use this to block resolution to private/internal ranges.<br />- When true, addresses NOT IN the CIDRRanges are filtered out (allow-list).<br />  Use this to restrict resolution to a specific set of allowed ranges. |
 
 
 #### ResourceProviderType

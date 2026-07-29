@@ -2614,6 +2614,9 @@ func (t *Translator) processBackendDestinationSetting(
 		ds.IsDynamicResolver = true
 		ds.Protocol = protocol
 		ds.ForceHTTP1Upstream = forceHTTP1Upstream
+		if backend.Spec.DynamicResolver != nil && backend.Spec.DynamicResolver.ResolvedAddressFilter != nil {
+			ds.DynamicResolverAddressFilter = buildDynamicResolverAddressFilter(backend.Spec.DynamicResolver.ResolvedAddressFilter)
+		}
 		return ds
 	}
 

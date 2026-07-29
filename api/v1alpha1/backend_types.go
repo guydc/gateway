@@ -134,6 +134,7 @@ type UnixSocket struct {
 // +kubebuilder:validation:XValidation:rule="self.type != 'DynamicResolver' || !has(self.endpoints)",message="DynamicResolver type cannot have endpoints specified"
 // +kubebuilder:validation:XValidation:rule="self.type != 'DynamicResolver' || !has(self.tls) || !(has(self.tls.autoSNIFromEndpointHostname) && self.tls.autoSNIFromEndpointHostname)",message="DynamicResolver type cannot use autoSNIFromEndpointHostname"
 // +kubebuilder:validation:XValidation:rule="!has(self.tls) || !(has(self.tls.autoSNIFromEndpointHostname) && self.tls.autoSNIFromEndpointHostname) || self.endpoints.all(e, (!has(e.ip) && !has(e.unix)) || has(e.hostname))",message="when autoSNIFromEndpointHostname is enabled, IP and Unix endpoints must define a hostname"
+// +kubebuilder:validation:XValidation:rule="!has(self.dynamicResolver) || (has(self.type) && self.type == 'DynamicResolver')",message="dynamicResolver can only be set when type is DynamicResolver"
 type BackendSpec struct {
 	// Type defines the type of the backend. Defaults to "Endpoints"
 	//
@@ -170,6 +171,12 @@ type BackendSpec struct {
 	//
 	// +optional
 	TLS *BackendTLSSettings `json:"tls,omitempty"`
+
+	// DynamicResolver holds configuration specific to DynamicResolver-type backends.
+	// Only valid when Type is DynamicResolver.
+	//
+	// +optional
+	DynamicResolver *DynamicResolverConfig `json:"dynamicResolver,omitempty"`
 }
 
 // BackendTLSSettings holds the TLS settings for the backend.
@@ -308,6 +315,37 @@ type BackendList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Backend `json:"items"`
+}
+
+// DynamicResolverConfig holds configuration specific to DynamicResolver-type backends.
+type DynamicResolverConfig struct {
+	// ResolvedAddressFilter filters IP addresses resolved from the Host/SNI header
+	// before they are used to connect to the upstream. Addresses matching the filter
+	// criteria are removed; if all resolved addresses are filtered out, the connection
+	// attempt fails. This is primarily a security control to prevent SSRF and DNS
+	// rebinding attacks by blocking resolution to private or internal IP ranges.
+	//
+	// +optional
+	ResolvedAddressFilter *ResolvedAddressFilter `json:"resolvedAddressFilter,omitempty"`
+}
+
+// ResolvedAddressFilter defines CIDR-based filtering of resolved IP addresses
+// for DynamicResolver backends.
+type ResolvedAddressFilter struct {
+	// CIDRRanges defines the IP address ranges to match against resolved addresses.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
+	CIDRRanges []CIDR `json:"cidrRanges"`
+
+	// Invert controls the filter direction:
+	// - When false (default), addresses IN the CIDRRanges are filtered out (block-list).
+	//   Use this to block resolution to private/internal ranges.
+	// - When true, addresses NOT IN the CIDRRanges are filtered out (allow-list).
+	//   Use this to restrict resolution to a specific set of allowed ranges.
+	//
+	// +optional
+	Invert *bool `json:"invert,omitempty"`
 }
 
 func init() {

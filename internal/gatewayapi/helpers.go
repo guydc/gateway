@@ -1006,6 +1006,29 @@ func parseCIDR(cidr string) (*ir.CIDRMatch, error) {
 	}, nil
 }
 
+// buildDynamicResolverAddressFilter converts the API ResolvedAddressFilter to its IR representation.
+func buildDynamicResolverAddressFilter(f *egv1a1.ResolvedAddressFilter) *ir.DynamicResolverAddressFilter {
+	if f == nil {
+		return nil
+	}
+	irFilter := &ir.DynamicResolverAddressFilter{}
+	for _, cidr := range f.CIDRRanges {
+		match, err := parseCIDR(string(cidr))
+		if err != nil {
+			// Invalid CIDRs are rejected by CEL/validation at admission time; skip silently here.
+			continue
+		}
+		irFilter.CIDRMatches = append(irFilter.CIDRMatches, match)
+	}
+	if len(irFilter.CIDRMatches) == 0 {
+		return nil
+	}
+	if f.Invert != nil {
+		irFilter.Invert = *f.Invert
+	}
+	return irFilter
+}
+
 func irConfigName(policy client.Object) string {
 	return fmt.Sprintf(
 		"%s/%s",

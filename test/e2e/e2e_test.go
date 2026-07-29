@@ -51,6 +51,7 @@ func TestE2E(t *testing.T) {
 		skipTests = append(skipTests,
 			tests.DynamicResolverBackendTest.ShortName,
 			tests.DynamicResolverBackendWithTLSTest.ShortName,
+			tests.DynamicResolverAddressFilterTest.ShortName,
 			tests.RateLimitCIDRMatchTest.ShortName,
 			tests.RateLimitCIDRInvertMatchAlwaysEnforceTest.ShortName,
 			tests.RateLimitCIDRInvertAlwaysExemptTest.ShortName,

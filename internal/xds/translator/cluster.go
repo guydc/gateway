@@ -43,6 +43,8 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
+	matcherv3 "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
+	xdscorev3 "github.com/cncf/xds/go/xds/core/v3"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/utils/ptr"
@@ -211,7 +213,7 @@ func dfpCacheName(ipFamily *egv1a1.IPFamily, dns *ir.DNS) string {
 	return fmt.Sprintf("%s-%s", base, suffix)
 }
 
-func buildDFPDNSCacheConfig(name string, dns *ir.DNS, dnsLookupFamily clusterv3.Cluster_DnsLookupFamily) *commondfpv3.DnsCacheConfig {
+func buildDFPDNSCacheConfig(name string, dns *ir.DNS, dnsLookupFamily clusterv3.Cluster_DnsLookupFamily, addressFilter *ir.DynamicResolverAddressFilter) *commondfpv3.DnsCacheConfig {
 	dnsCacheConfig := &commondfpv3.DnsCacheConfig{
 		Name:            name,
 		DnsLookupFamily: dnsLookupFamily,
@@ -222,7 +224,26 @@ func buildDFPDNSCacheConfig(name string, dns *ir.DNS, dnsLookupFamily clusterv3.
 		dnsCacheConfig.DnsRefreshRate = durationpb.New(dns.DNSRefreshRate.Duration)
 	}
 
+	if addressFilter != nil && len(addressFilter.CIDRMatches) > 0 {
+		dnsCacheConfig.ResolvedAddressFilter = buildCIDRAddressMatcher(addressFilter.CIDRMatches, addressFilter.Invert)
+	}
+
 	return dnsCacheConfig
+}
+
+// buildCIDRAddressMatcher builds an AddressMatcher from a slice of CIDRMatch entries.
+func buildCIDRAddressMatcher(cidrs []*ir.CIDRMatch, invert bool) *matcherv3.AddressMatcher {
+	ranges := make([]*xdscorev3.CidrRange, 0, len(cidrs))
+	for _, c := range cidrs {
+		ranges = append(ranges, &xdscorev3.CidrRange{
+			AddressPrefix: c.AddressPrefix(),
+			PrefixLen:     &wrapperspb.UInt32Value{Value: c.MaskLen},
+		})
+	}
+	return &matcherv3.AddressMatcher{
+		Ranges:      ranges,
+		InvertMatch: invert,
+	}
 }
 
 type buildClusterResult struct {
@@ -501,7 +522,12 @@ func buildXdsCluster(args *xdsClusterArgs) (*buildClusterResult, error) {
 	switch args.endpointType {
 	case EndpointTypeDynamicResolver:
 		cacheName := dfpCacheName(args.ipFamily, args.dns)
-		dnsCacheConfig := buildDFPDNSCacheConfig(cacheName, args.dns, dnsLookupFamily)
+		// Extract address filter from settings — DynamicResolver has exactly one setting.
+		var addressFilter *ir.DynamicResolverAddressFilter
+		if len(args.settings) > 0 {
+			addressFilter = args.settings[0].DynamicResolverAddressFilter
+		}
+		dnsCacheConfig := buildDFPDNSCacheConfig(cacheName, args.dns, dnsLookupFamily, addressFilter)
 
 		dfp := &dfpv3.ClusterConfig{
 			ClusterImplementationSpecifier: &dfpv3.ClusterConfig_DnsCacheConfig{
@@ -1056,7 +1082,7 @@ func getHealthCheckOverridesPort(hc *ir.HealthCheck) *uint32 {
 		return nil
 	}
 
-	return new(hc.Active.Overrides.Port)
+	return &hc.Active.Overrides.Port
 }
 
 func getHealthCheckOverridesHostname(hc *ir.HealthCheck, ep *ir.DestinationEndpoint) string {

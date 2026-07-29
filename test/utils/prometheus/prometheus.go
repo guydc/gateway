@@ -41,6 +41,8 @@ func NewClient(kubeClient client.Client, nn types.NamespacedName) (*Client, erro
 		}
 	}
 
+	addr = "http://localhost:9090"
+
 	if len(addr) == 0 {
 		return nil, fmt.Errorf("no ingress found for %s", nn.String())
 	}

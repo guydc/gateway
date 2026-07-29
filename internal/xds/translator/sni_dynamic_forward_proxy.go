@@ -50,7 +50,7 @@ func buildSNIDynamicForwardProxyFilter(irRoute *ir.TCPRoute) (*listenerv3.Filter
 	// (see processTCPListenerXdsTranslation), so the same is used here to keep the cache name in sync.
 	dnsLookupFamily := computeDNSLookupFamily(nil, irRoute.DNS)
 	cacheName := dfpCacheName(nil, irRoute.DNS)
-	dnsCacheConfig := buildDFPDNSCacheConfig(cacheName, irRoute.DNS, dnsLookupFamily)
+	dnsCacheConfig := buildDFPDNSCacheConfig(cacheName, irRoute.DNS, dnsLookupFamily, nil)
 
 	cfg := &snidfpv3.FilterConfig{
 		DnsCacheConfig: dnsCacheConfig,

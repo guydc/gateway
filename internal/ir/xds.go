@@ -2070,6 +2070,11 @@ type DestinationSetting struct {
 	// A dynamic resolver is a destination that is resolved dynamically using the request's host header.
 	IsDynamicResolver bool `json:"isDynamicResolver,omitempty" yaml:"isDynamicResolver,omitempty"`
 
+	// DynamicResolverAddressFilter holds CIDR-based filtering for DynamicResolver destinations.
+	// When set, resolved IP addresses matching (or not matching when Invert=true) the CIDRs are filtered out.
+	// +optional
+	DynamicResolverAddressFilter *DynamicResolverAddressFilter `json:"dynamicResolverAddressFilter,omitempty" yaml:"dynamicResolverAddressFilter,omitempty"`
+
 	// IsCustomBackend specifies whether the destination is a custom backend.
 	IsCustomBackend bool `json:"isCustomBackend,omitempty" yaml:"isCustomBackend,omitempty"`
 
@@ -2737,8 +2742,19 @@ type RateLimitCost struct {
 	Format *string `json:"format,omitempty" yaml:"format,omitempty"`
 }
 
+// DynamicResolverAddressFilter defines CIDR-based filtering of IP addresses resolved
+// by a DynamicResolver backend before they are used for upstream connections.
+// +k8s:deepcopy-gen=true
+type DynamicResolverAddressFilter struct {
+	// CIDRMatches holds the parsed CIDR ranges to match against resolved addresses.
+	CIDRMatches []*CIDRMatch `json:"cidrMatches,omitempty" yaml:"cidrMatches,omitempty"`
+	// Invert inverts the match: if true, addresses NOT matching any CIDR are filtered out (allow-list).
+	Invert bool `json:"invert,omitempty" yaml:"invert,omitempty"`
+}
+
 // CIDRMatch defines the match conditions on the source IP's CIDR for rate limiting.
 // +k8s:deepcopy-gen=true
+
 type CIDRMatch struct {
 	// CIDR is the full CIDR string (e.g. "192.168.0.0/24") from the API source match.
 	CIDR string `json:"cidr" yaml:"cidr"`

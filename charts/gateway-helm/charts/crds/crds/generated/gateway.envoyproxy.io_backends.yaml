@@ -64,6 +64,43 @@ spec:
                   - gateway.envoyproxy.io/wss
                   type: string
                 type: array
+              dynamicResolver:
+                description: |-
+                  DynamicResolver holds configuration specific to DynamicResolver-type backends.
+                  Only valid when Type is DynamicResolver.
+                properties:
+                  resolvedAddressFilter:
+                    description: |-
+                      ResolvedAddressFilter filters IP addresses resolved from the Host/SNI header
+                      before they are used to connect to the upstream. Addresses matching the filter
+                      criteria are removed; if all resolved addresses are filtered out, the connection
+                      attempt fails. This is primarily a security control to prevent SSRF and DNS
+                      rebinding attacks by blocking resolution to private or internal IP ranges.
+                    properties:
+                      cidrRanges:
+                        description: CIDRRanges defines the IP address ranges to match
+                          against resolved addresses.
+                        items:
+                          description: |-
+                            CIDR defines a CIDR Address range.
+                            A CIDR can be an IPv4 address range such as "192.168.1.0/24" or an IPv6 address range such as "2001:0db8:11a3:09d7::/64".
+                          pattern: ((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/([0-9]+))|((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\/([0-9]+))
+                          type: string
+                        maxItems: 64
+                        minItems: 1
+                        type: array
+                      invert:
+                        description: |-
+                          Invert controls the filter direction:
+                          - When false (default), addresses IN the CIDRRanges are filtered out (block-list).
+                            Use this to block resolution to private/internal ranges.
+                          - When true, addresses NOT IN the CIDRRanges are filtered out (allow-list).
+                            Use this to restrict resolution to a specific set of allowed ranges.
+                        type: boolean
+                    required:
+                    - cidrRanges
+                    type: object
+                type: object
               endpoints:
                 description: Endpoints defines the endpoints to be used when connecting
                   to the backend.
@@ -480,6 +517,9 @@ spec:
               rule: '!has(self.tls) || !(has(self.tls.autoSNIFromEndpointHostname)
                 && self.tls.autoSNIFromEndpointHostname) || self.endpoints.all(e,
                 (!has(e.ip) && !has(e.unix)) || has(e.hostname))'
+            - message: dynamicResolver can only be set when type is DynamicResolver
+              rule: '!has(self.dynamicResolver) || (has(self.type) && self.type ==
+                ''DynamicResolver'')'
           status:
             description: Status defines the current status of Backend.
             properties:
